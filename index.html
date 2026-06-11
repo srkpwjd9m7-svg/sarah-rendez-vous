@@ -1103,7 +1103,7 @@ function renderEvents(sortedEvents) {
         </label>
         <label>
           Photo(s) de fin de rendez-vous
-          <input type="file" id="completion-photos-${item.id}" accept="image/*" multiple>
+          <input type="file" id="completion-photos-${item.id}" accept="image/*" multiple required>
         </label>
         <div class="event-actions">
           <button type="button" class="primary" onclick="completeEvent('${escapeAttribute(item.id)}')">Valider ce rendez-vous</button>
@@ -1170,6 +1170,15 @@ async function completeEvent(eventId) {
   const photoField = document.getElementById("completion-photos-" + eventId);
   const completionNote = noteField ? noteField.value.trim() : "";
   const completionFiles = photoField ? Array.from(photoField.files) : [];
+
+  if (!completionFiles.length) {
+    window.alert("Il faut obligatoirement ajouter au moins une photo pour valider la fin du rendez-vous.");
+    if (photoField) {
+      photoField.focus();
+    }
+    return;
+  }
+
   const completionPhotos = await Promise.all(completionFiles.map(fileToDataUrl));
 
   currentEvent.completed = true;
