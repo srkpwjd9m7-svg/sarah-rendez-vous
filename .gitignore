@@ -1,0 +1,12 @@
+# OS
+.DS_Store
+
+# Local backend data (SQLite + photos uploadées en dev)
+server/var/
+
+# Node deps
+node_modules/
+server/node_modules/
+
+# Logs
+*.log
