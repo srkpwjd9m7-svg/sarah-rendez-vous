@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#fff7ef">
 <title>Nos Rendez-vous</title>
 <link rel="stylesheet" href="assets/leaflet/leaflet.css">
-<link rel="stylesheet" href="assets/app.css?v=1">
+<link rel="stylesheet" href="assets/app.css?v=3">
 <script>
 // Runtime config — derives basePath from URL so the same files serve both
 // the production instance (/rdv/) and the public demo (/rdv-demo/).
@@ -33,84 +33,15 @@
 </head>
 <body>
 
-<!-- Lock screen -->
-<div class="lock-screen" id="lock-screen">
-  <form class="lock-card" id="lock-form" autocomplete="off">
-    <div class="heart">❤</div>
-    <h1>Nos Rendez-vous</h1>
-    <p class="sub">Entre le code secret pour entrer.</p>
-    <input type="password" id="access-code" inputmode="numeric" autocomplete="off" placeholder="• • • • • • • •" required>
-    <div class="err" id="lock-error"></div>
-    <button class="btn btn-primary btn-block" type="submit">Entrer</button>
-  </form>
-</div>
-
 <!-- App shell -->
 <div class="shell" id="shell">
   <div class="shell-inner" id="shell-inner">
     <div class="offline-banner" id="offline-banner">Mode hors-ligne — sync indisponible</div>
-    <button class="logout-fab" id="logout-btn" type="button" title="Se déconnecter" aria-label="Se déconnecter">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
-    </button>
     <div class="app" id="app"></div>
   </div>
 </div>
 
 <script src="assets/leaflet/leaflet.js"></script>
-<script>
-// Lock screen flow
-(function(){
-  const API_BASE = (window.__rdvConfig && window.__rdvConfig.apiBase) || '/rdv/api';
-  const CODE_KEY = 'nos-rendez-vous-access-code';
-  const OK_KEY = 'nos-rendez-vous-access-ok';
-  const lockScreen = document.getElementById('lock-screen');
-  const lockForm = document.getElementById('lock-form');
-  const codeInput = document.getElementById('access-code');
-  const errEl = document.getElementById('lock-error');
-
-  function unlock(){
-    lockScreen.classList.add('is-hidden');
-    if (typeof window.__rdvStart === 'function') window.__rdvStart();
-  }
-
-  // Auto-unlock if session already valid
-  try {
-    if (sessionStorage.getItem(OK_KEY) === 'ok' && localStorage.getItem(CODE_KEY)){
-      lockScreen.classList.add('is-hidden');
-    }
-  } catch {}
-
-  lockForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const code = codeInput.value.trim();
-    if (!code){ errEl.textContent = 'Code incorrect.'; return; }
-    errEl.textContent = '';
-    try {
-      const res = await fetch(API_BASE + '/auth/check', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify({ code })
-      });
-      if (res.ok){
-        try { localStorage.setItem(CODE_KEY, code); sessionStorage.setItem(OK_KEY, 'ok'); } catch {}
-        codeInput.value = '';
-        unlock();
-        return;
-      }
-      if (res.status === 401){
-        errEl.textContent = 'Code incorrect. Réessaie doucement.';
-        codeInput.select();
-        return;
-      }
-      errEl.textContent = "Impossible de joindre l'API.";
-    } catch {
-      errEl.textContent = "Impossible de joindre l'API.";
-    }
-  });
-
-  setTimeout(() => codeInput.focus(), 60);
-})();
-</script>
-<script src="assets/app.js?v=1"></script>
+<script src="assets/app.js?v=3"></script>
 </body>
 </html>

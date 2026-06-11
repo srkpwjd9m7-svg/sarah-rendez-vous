@@ -14,8 +14,15 @@
   const API_BASE = (window.__rdvConfig && window.__rdvConfig.apiBase) || '/rdv/api';
   const STORAGE_KEY = 'nos-rendez-vous-events';
   const ACCESS_CODE_KEY = 'nos-rendez-vous-access-code';
-  const ACCESS_OK_KEY = 'nos-rendez-vous-access-ok';
+  const DEFAULT_ACCESS_CODE = '01052021';
   const NOMINATIM = 'https://nominatim.openstreetmap.org';
+
+  // Seed default access code so the app boots without a lock screen.
+  try {
+    if (!localStorage.getItem(ACCESS_CODE_KEY)){
+      localStorage.setItem(ACCESS_CODE_KEY, DEFAULT_ACCESS_CODE);
+    }
+  } catch {}
 
   // ----- Icons -----
   const ICON = {
@@ -38,6 +45,17 @@
     heart: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-6.5-4.8-9.2-9C1 9 2.5 5 6.2 5 9 5 10.5 7 12 9c1.5-2 3-4 5.8-4C21.5 5 23 9 21.2 12c-2.7 4.2-9.2 9-9.2 9z"/></svg>',
     logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>',
     share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg>',
+    utensils: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v7a2 2 0 0 0 4 0V3M7 11v10M17 3c-1.5 0-3 1.5-3 5s1.5 4 3 4v9"/></svg>',
+    cup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M17 9h2.5a2.5 2.5 0 0 1 0 5H17"/><path d="M7 3v2M11 3v2"/></svg>',
+    film: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18M8 5v14M16 5v14"/></svg>',
+    walk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4.4" r="1.8"/><path d="M11 9l3 2 1.5 3.5M11 9l-1.6 4-2 1.2M14.3 11.2l-1 4 2 5M9.4 13l-2 7"/></svg>',
+    basket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10h14l-1.4 9H6.4z"/><path d="M9 10l3-5 3 5"/><path d="M9 13.5v3M15 13.5v3"/></svg>',
+    museum: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5"/><path d="M5 9v8M10 9v8M14 9v8M19 9v8M3 20h18"/></svg>',
+    music: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
+    palette: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 2-2 0-1.4 1-2 2-2h1a4 4 0 0 0 4-4c0-4.4-4-8-9-8z"/><circle cx="8" cy="11" r="1" fill="currentColor"/><circle cx="12" cy="8" r="1" fill="currentColor"/><circle cx="16" cy="11" r="1" fill="currentColor"/></svg>',
+    leaf: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19s-1-9 6-13c5 0 8 3 8 8-4 7-13 6-14 5z"/><path d="M9 15c2-3 5-4 5-4"/></svg>',
+    bike: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17l4-7h5l-3 7M10 10l-1-3H7M15 10l2-3"/></svg>',
+    locate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>',
   };
 
   const WD = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -580,16 +598,107 @@
   }
 
   // ============================================================
+  // COMPOSER — propositions d'activités + suggestions par lieu
+  // ============================================================
+  const CAT_ICON = {
+    resto: ICON.utensils, cafe: ICON.cup, cine: ICON.film, balade: ICON.walk,
+    picnic: ICON.basket, culture: ICON.museum, concert: ICON.music,
+    atelier: ICON.palette, spa: ICON.leaf, sport: ICON.bike, surprise: ICON.spark,
+  };
+
+  const ACTIVITY_IDEAS = [
+    { id: 'resto', label: 'Restaurant', title: 'Dîner aux chandelles' },
+    { id: 'cafe', label: 'Café · Brunch', title: 'Brunch gourmand' },
+    { id: 'cine', label: 'Cinéma', title: 'Séance ciné & popcorn' },
+    { id: 'balade', label: 'Balade', title: 'Balade main dans la main' },
+    { id: 'picnic', label: 'Pique-nique', title: 'Pique-nique au parc' },
+    { id: 'culture', label: 'Musée · Expo', title: "Visite d'une expo" },
+    { id: 'concert', label: 'Concert', title: 'Concert en amoureux' },
+    { id: 'atelier', label: 'Atelier', title: 'Atelier créatif à deux' },
+    { id: 'spa', label: 'Spa · Détente', title: 'Moment cocooning au spa' },
+    { id: 'sport', label: 'Sport', title: 'Sortie vélo à deux' },
+    { id: 'surprise', label: 'Surprise', title: 'Surprise mystère' },
+  ];
+
+  // Zones lyonnaises + suggestions concrètes. Les coordonnées permettent
+  // de poser le marker Leaflet sans aller-retour Nominatim.
+  const ZONES = [
+    { id: 'presquile', area: "Presqu'île", spots: [
+      { title: 'Dîner rue Mercière', place: 'Rue Mercière, Lyon', cat: 'resto', d: '5 min', coords: { lat: 45.7625, lng: 4.8331 } },
+      { title: 'Ciné à Bellecour', place: 'Pathé Bellecour, Lyon', cat: 'cine', d: '8 min', coords: { lat: 45.7572, lng: 4.8323 } },
+      { title: 'Café cosy', place: 'Place des Jacobins, Lyon', cat: 'cafe', d: '3 min', coords: { lat: 45.7607, lng: 4.8333 } },
+    ]},
+    { id: 'vieuxlyon', area: 'Vieux Lyon', spots: [
+      { title: 'Flânerie dans les traboules', place: 'Vieux Lyon, Lyon', cat: 'balade', d: 'sur place', coords: { lat: 45.7621, lng: 4.8270 } },
+      { title: 'Bouchon traditionnel', place: 'Rue Saint-Jean, Lyon', cat: 'resto', d: '4 min', coords: { lat: 45.7621, lng: 4.8278 } },
+      { title: 'Montée à Fourvière', place: 'Basilique Notre-Dame de Fourvière, Lyon', cat: 'balade', d: '12 min', coords: { lat: 45.7622, lng: 4.8222 } },
+    ]},
+    { id: 'tetedor', area: "Tête d'Or", spots: [
+      { title: 'Pique-nique au lac', place: "Parc de la Tête d'Or, Lyon", cat: 'picnic', d: 'sur place', coords: { lat: 45.7772, lng: 4.8527 } },
+      { title: 'Balade à vélo', place: "Allées du Parc de la Tête d'Or, Lyon", cat: 'sport', d: '2 min', coords: { lat: 45.7783, lng: 4.8540 } },
+      { title: 'Roseraie en amoureux', place: "Roseraie du Parc de la Tête d'Or, Lyon", cat: 'balade', d: '6 min', coords: { lat: 45.7802, lng: 4.8520 } },
+    ]},
+    { id: 'croixrousse', area: 'Croix-Rousse', spots: [
+      { title: 'Atelier poterie', place: 'Croix-Rousse, Lyon', cat: 'atelier', d: '5 min', coords: { lat: 45.7770, lng: 4.8290 } },
+      { title: 'Apéro sur les pentes', place: 'Pentes de la Croix-Rousse, Lyon', cat: 'cafe', d: '7 min', coords: { lat: 45.7723, lng: 4.8341 } },
+      { title: 'Marché du matin', place: 'Boulevard de la Croix-Rousse, Lyon', cat: 'balade', d: '4 min', coords: { lat: 45.7779, lng: 4.8311 } },
+    ]},
+    { id: 'confluence', area: 'Confluence', spots: [
+      { title: 'Expo au musée', place: 'Musée des Confluences, Lyon', cat: 'culture', d: '6 min', coords: { lat: 45.7333, lng: 4.8181 } },
+      { title: 'Ciné & resto', place: 'Pôle de loisirs Confluence, Lyon', cat: 'cine', d: '5 min', coords: { lat: 45.7437, lng: 4.8155 } },
+      { title: "Balade au bord de l'eau", place: 'Quais de Saône, Lyon', cat: 'balade', d: '3 min', coords: { lat: 45.7472, lng: 4.8170 } },
+    ]},
+  ];
+
+  function composerHTML(){
+    const ideas = ACTIVITY_IDEAS.map(a => `
+      <button type="button" class="idea-card" data-idea="${a.id}" data-title="${escapeHTML(a.title)}">
+        <span class="idea-ic">${CAT_ICON[a.id] || ICON.heart}</span>
+        <span class="idea-lb">${escapeHTML(a.label)}</span>
+      </button>`).join('');
+    const zones = ZONES.map(z => `<button type="button" class="zone-chip" data-zone="${z.id}">${escapeHTML(z.area)}</button>`).join('');
+    return `
+      <div class="composer-sec">
+        <div class="cs-label">Une idée ? Pioche <span class="hint">${ACTIVITY_IDEAS.length} activités</span></div>
+        <div class="idea-scroll">${ideas}</div>
+      </div>
+      <div class="composer-sec">
+        <div class="cs-label">Autour de vous <span class="hint">selon le lieu</span></div>
+        <div class="zone-row">
+          <button type="button" class="zone-chip locate" data-locate>${ICON.locate} Ma position</button>
+          ${zones}
+        </div>
+        <div class="zone-suggest" data-zone-suggest></div>
+      </div>
+      <div class="cs-divider"><span>ou compose à la main</span></div>`;
+  }
+
+  function zoneSuggestionsHTML(zone){
+    return zone.spots.map((s, i) => `
+      <button type="button" class="sugg-card" data-sugg data-idx="${i}" data-title="${escapeHTML(s.title)}" data-place="${escapeHTML(s.place)}">
+        <span class="sugg-ic">${CAT_ICON[s.cat] || ICON.heart}</span>
+        <span class="sugg-body">
+          <span class="sugg-t">${escapeHTML(s.title)}</span>
+          <span class="sugg-p">${ICON.pin} ${escapeHTML(s.place)} · à ${escapeHTML(s.d)}</span>
+        </span>
+        <span class="sugg-add">${ICON.plus}</span>
+      </button>`).join('');
+  }
+
+  // ============================================================
   // SHEET — Nouveau / Modifier RDV
   // ============================================================
   function formSheetHTML(initial){
     const i = initial || {};
+    const isNew = !i.id;
     return `
       <div class="sheet-scrim" id="sheet-scrim">
         <div class="sheet">
           <div class="sheet-grip"></div>
-          <h2>${i.id ? 'Modifier' : 'Nouveau'} rendez-vous</h2>
-          <p class="sub">${i.id ? 'Ajuste comme tu veux.' : 'Propose une date à ton amour.'}</p>
+          <h2>${isNew ? 'Nouveau' : 'Modifier'} rendez-vous</h2>
+          <p class="sub">${isNew ? 'Propose une date à ton amour — pioche une idée ou laisse-toi guider par le lieu.' : 'Ajuste comme tu veux.'}</p>
+
+          ${isNew ? composerHTML() : ''}
 
           <div class="field">
             <label>Titre</label>
@@ -693,6 +802,69 @@
       const v = locInput.value.trim();
       if (v && !coords) geocode(v);
     });
+
+    // Composer — propositions d'activités + suggestions par lieu (créa. seulement)
+    const titleInput = scrim.querySelector('#f-title');
+    const ideaCards = scrim.querySelectorAll('.idea-card');
+    ideaCards.forEach(card => {
+      card.addEventListener('click', () => {
+        const wasActive = card.classList.contains('active');
+        ideaCards.forEach(x => x.classList.remove('active'));
+        if (!wasActive){
+          card.classList.add('active');
+          if (titleInput && !titleInput.value.trim()) titleInput.value = card.dataset.title;
+        }
+      });
+    });
+
+    const suggestWrap = scrim.querySelector('[data-zone-suggest]');
+    function showZone(zone, chip){
+      scrim.querySelectorAll('.zone-chip').forEach(x => x.classList.remove('active'));
+      if (chip) chip.classList.add('active');
+      if (suggestWrap) suggestWrap.innerHTML = zoneSuggestionsHTML(zone);
+    }
+    scrim.querySelectorAll('.zone-chip[data-zone]').forEach(ch => {
+      ch.addEventListener('click', () => {
+        const z = ZONES.find(z => z.id === ch.dataset.zone);
+        if (z) showZone(z, ch);
+      });
+    });
+
+    const locateBtn = scrim.querySelector('[data-locate]');
+    if (locateBtn){
+      locateBtn.addEventListener('click', () => {
+        locateBtn.innerHTML = 'Localisation…';
+        locateBtn.classList.add('active');
+        setTimeout(() => {
+          locateBtn.innerHTML = ICON.locate + ' Près de vous';
+          const z = ZONES[2]; // Tête d'Or (simulé)
+          showZone(z, locateBtn);
+        }, 650);
+      });
+    }
+
+    if (suggestWrap){
+      suggestWrap.addEventListener('click', (e) => {
+        const card = e.target.closest('[data-sugg]');
+        if (!card) return;
+        suggestWrap.querySelectorAll('.sugg-card').forEach(x => x.classList.remove('active'));
+        card.classList.add('active');
+        if (titleInput) titleInput.value = card.dataset.title;
+        const place = card.dataset.place;
+        locInput.value = place;
+        // Trouve la zone active + le spot pour récupérer ses coordonnées (sinon Nominatim)
+        const activeZone = scrim.querySelector('.zone-chip.active');
+        const zoneId = activeZone && activeZone.dataset.zone;
+        const idx = +card.dataset.idx;
+        const zone = zoneId ? ZONES.find(z => z.id === zoneId) : ZONES[2];
+        const spot = zone && zone.spots[idx];
+        if (spot && spot.coords && map){
+          setMarker(spot.coords.lat, spot.coords.lng);
+        } else {
+          geocode(place);
+        }
+      });
+    }
 
     // Segmented control
     let sendMode = (initial && initial.status === 'confirmed') ? 'direct' : 'invite';
@@ -1200,15 +1372,6 @@
     if (e.target.closest('[data-cal-next]')){ state.calOffset++; render(); return; }
   });
 
-  // Logout
-  const logoutBtn = document.getElementById('logout-btn');
-  if (logoutBtn){
-    logoutBtn.addEventListener('click', () => {
-      try { sessionStorage.removeItem(ACCESS_OK_KEY); localStorage.removeItem(ACCESS_CODE_KEY); } catch {}
-      window.location.reload();
-    });
-  }
-
   // ============================================================
   // COUNTDOWN
   // ============================================================
@@ -1251,13 +1414,5 @@
     } catch {}
   }
 
-  // Expose start so the lock screen can trigger it after auth
-  window.__rdvStart = start;
-
-  // If already logged in (session), boot now
-  try {
-    if (sessionStorage.getItem(ACCESS_OK_KEY) === 'ok' && getCode()){
-      start();
-    }
-  } catch {}
+  start();
 })();
