@@ -915,7 +915,7 @@ function saveEventsToLocal(list) {
 function seedEvents() {
   const sample = [
     {
-      id: "demo-1",
+      id: "00000000-0000-4000-8000-000000000001",
       title: "Balade et cafe doux",
       date: toDateInputValue(new Date()),
       location: "Lyon",
@@ -935,6 +935,7 @@ function seedEvents() {
 
 async function loadEvents() {
   const localEvents = loadEventsFromLocal({ allowSeed: !supabaseClient }).map(normalizeEvent);
+  saveEventsToLocal(localEvents);
 
   if (!supabaseClient) {
     updateSyncBanner("Mode local actif. La synchronisation Supabase n'est pas encore configuree.", "");
@@ -976,7 +977,7 @@ async function loadEvents() {
 
 function normalizeEvent(item) {
   return {
-    id: item.id || crypto.randomUUID(),
+    id: isValidUuid(item.id) ? item.id : crypto.randomUUID(),
     title: item.title || "",
     date: item.date || item.event_date || toDateInputValue(new Date()),
     location: item.location || "",
@@ -988,6 +989,10 @@ function normalizeEvent(item) {
     completionNote: item.completionNote || item.completion_note || "",
     completionPhotos: Array.isArray(item.completionPhotos) ? item.completionPhotos : Array.isArray(item.completion_photos) ? item.completion_photos : []
   };
+}
+
+function isValidUuid(value) {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function mapSupabaseRowToEvent(row) {

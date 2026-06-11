@@ -253,6 +253,25 @@ Etat actuel :
 
 Si le site affiche encore un message d'erreur Supabase, ce ne sera normalement plus lie a l'absence de table ou de bucket, puisque ces elements repondent maintenant correctement.
 
+Une erreur deja rencontree pendant la migration etait :
+
+```json
+{
+  "code": "22P02",
+  "message": "invalid input syntax for type uuid: \"demo-1\""
+}
+```
+
+Cause :
+
+- une ancienne donnee locale de demonstration utilisait `demo-1` comme identifiant
+- Supabase attend un vrai UUID
+
+Correction appliquee :
+
+- les donnees locales sont maintenant normalisees automatiquement
+- tout identifiant non conforme est remplace par un vrai UUID avant synchronisation
+
 ## Limites actuelles
 
 - pas de synchronisation entre plusieurs appareils
