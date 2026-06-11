@@ -331,6 +331,25 @@ button:hover{
   font-weight:700;
 }
 
+.sync-banner{
+  margin-top:18px;
+  padding:12px 14px;
+  border-radius:18px;
+  background:rgba(255,255,255,0.7);
+  color:var(--accent-deep);
+  font-size:0.92rem;
+}
+
+.sync-banner.is-error{
+  background:rgba(191,75,95,0.12);
+  color:#9b2f49;
+}
+
+.sync-banner.is-success{
+  background:rgba(132,201,160,0.18);
+  color:#2f6b44;
+}
+
 .calendar{
   display:grid;
   grid-template-columns:repeat(7, minmax(0, 1fr));
@@ -596,6 +615,7 @@ button:hover{
         Choisis une date, un lieu, ajoute un petit mot et quelques photos. Le site garde chaque activite
         dans le navigateur pour creer un joli carnet de moments a deux.
       </p>
+      <div class="sync-banner" id="sync-banner">Mode local actif. La synchronisation Supabase n'est pas encore configuree.</div>
 
       <div class="hero-grid">
         <article class="card highlight-card">
@@ -712,12 +732,15 @@ button:hover{
     </section>
   </main>
 
+<script src="./supabase-config.js"></script>
+<script src="./assets/supabase/supabase.js"></script>
 <script src="./assets/leaflet/leaflet.js"></script>
 <script>
 const STORAGE_KEY = "nos-rendez-vous-souvenirs";
 const ACCESS_CODE = "01052021";
 const ACCESS_STORAGE_KEY = "nos-rendez-vous-access-ok";
 const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org";
+const SUPABASE_BUCKET = "date-memories";
 const form = document.getElementById("event-form");
 const upcomingEventsContainer = document.getElementById("events-upcoming");
 const completedEventsContainer = document.getElementById("events-completed");
@@ -737,6 +760,7 @@ const lockScreen = document.getElementById("lock-screen");
 const lockForm = document.getElementById("lock-form");
 const accessCodeInput = document.getElementById("access-code");
 const lockError = document.getElementById("lock-error");
+const syncBanner = document.getElementById("sync-banner");
 
 const monthNames = [
   "Janvier", "Fevrier", "Mars", "Avril", "Mai", "Juin",
@@ -745,7 +769,24 @@ const monthNames = [
 
 const weekdayNames = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
-let events = loadEvents();
+const supabaseConfig = window.SUPABASE_CONFIG || { url: "", anonKey: "" };
+const isSupabaseConfigured = Boolean(
+  supabaseConfig.url &&
+  supabaseConfig.anonKey &&
+  !supabaseConfig.url.includes("votre-projet") &&
+  !supabaseConfig.anonKey.includes("votre-anon-key")
+);
+
+const supabaseClient = isSupabaseConfigured
+  ? supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      }
+    })
+  : null;
+
+let events = [];
 let selectedCoordinates = null;
 let map = null;
 let marker = null;
@@ -780,8 +821,7 @@ form.addEventListener("submit", async (event) => {
   }
 
   const photos = await Promise.all(files.map(fileToDataUrl));
-
-  events.push({
+  const newEvent = {
     id: crypto.randomUUID(),
     title,
     date,
@@ -793,9 +833,25 @@ form.addEventListener("submit", async (event) => {
     completed: false,
     completionNote: "",
     completionPhotos: []
-  });
+  };
 
-  saveEvents();
+  if (supabaseClient) {
+    try {
+      newEvent.photos = await uploadFilesToStorage(files, newEvent.id, "planned");
+      events.push(newEvent);
+      await insertEventToSupabase(newEvent);
+      saveEventsToLocal(events);
+      updateSyncBanner("Rendez-vous synchronise avec Supabase.", "success");
+    } catch (error) {
+      updateSyncBanner("Echec de synchronisation Supabase. Les donnees restent locales pour l'instant.", "error");
+      events.push(newEvent);
+      saveEventsToLocal(events);
+    }
+  } else {
+    events.push(newEvent);
+    saveEventsToLocal(events);
+  }
+
   form.reset();
   selectedCoordinates = null;
   resetMapView();
@@ -836,22 +892,24 @@ resetButton.addEventListener("click", () => {
     return;
   }
 
-  events = [];
-  saveEvents();
-  render();
+  clearAllEvents();
 });
 
-function loadEvents() {
+function loadEventsFromLocal(options = {}) {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : seedEvents();
+    if (raw) {
+      return JSON.parse(raw);
+    }
+
+    return options.allowSeed === false ? [] : seedEvents();
   } catch (error) {
-    return seedEvents();
+    return options.allowSeed === false ? [] : seedEvents();
   }
 }
 
-function saveEvents() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+function saveEventsToLocal(list) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 }
 
 function seedEvents() {
@@ -873,6 +931,283 @@ function seedEvents() {
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sample));
   return sample;
+}
+
+async function loadEvents() {
+  const localEvents = loadEventsFromLocal({ allowSeed: !supabaseClient }).map(normalizeEvent);
+
+  if (!supabaseClient) {
+    updateSyncBanner("Mode local actif. La synchronisation Supabase n'est pas encore configuree.", "");
+    return localEvents;
+  }
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("date_events")
+      .select("*")
+      .order("event_date", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    const remoteEvents = (data || []).map(mapSupabaseRowToEvent);
+
+    if (!remoteEvents.length && localEvents.length) {
+      const migrated = await migrateLocalEventsToSupabase(localEvents);
+      updateSyncBanner("Donnees locales migrees vers Supabase.", "success");
+      return migrated;
+    }
+
+    saveEventsToLocal(remoteEvents);
+    updateSyncBanner("Synchronisation Supabase active.", "success");
+    return remoteEvents;
+  } catch (error) {
+    updateSyncBanner("Impossible de charger Supabase. Le site utilise temporairement les donnees locales.", "error");
+    return localEvents;
+  }
+}
+
+function normalizeEvent(item) {
+  return {
+    id: item.id || crypto.randomUUID(),
+    title: item.title || "",
+    date: item.date || item.event_date || toDateInputValue(new Date()),
+    location: item.location || "",
+    coordinates: item.coordinates || null,
+    mapLink: item.mapLink || item.map_link || "",
+    note: item.note || "",
+    photos: Array.isArray(item.photos) ? item.photos : [],
+    completed: Boolean(item.completed),
+    completionNote: item.completionNote || item.completion_note || "",
+    completionPhotos: Array.isArray(item.completionPhotos) ? item.completionPhotos : Array.isArray(item.completion_photos) ? item.completion_photos : []
+  };
+}
+
+function mapSupabaseRowToEvent(row) {
+  return normalizeEvent({
+    id: row.id,
+    title: row.title,
+    date: row.event_date,
+    location: row.location,
+    coordinates: row.coordinates,
+    mapLink: row.map_link,
+    note: row.note,
+    photos: row.photos,
+    completed: row.completed,
+    completionNote: row.completion_note,
+    completionPhotos: row.completion_photos
+  });
+}
+
+function mapEventToSupabaseRow(item) {
+  return {
+    id: item.id,
+    title: item.title,
+    event_date: item.date,
+    location: item.location,
+    coordinates: item.coordinates,
+    map_link: item.mapLink,
+    note: item.note,
+    photos: item.photos,
+    completed: item.completed,
+    completion_note: item.completionNote,
+    completion_photos: item.completionPhotos
+  };
+}
+
+async function insertEventToSupabase(item) {
+  const { error } = await supabaseClient
+    .from("date_events")
+    .insert(mapEventToSupabaseRow(item));
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function updateEventInSupabase(item) {
+  const { error } = await supabaseClient
+    .from("date_events")
+    .update(mapEventToSupabaseRow(item))
+    .eq("id", item.id);
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function clearAllEvents() {
+  const existingEvents = [...events];
+
+  if (supabaseClient) {
+    try {
+      const paths = collectStoragePaths(existingEvents);
+
+      if (paths.length) {
+        await supabaseClient.storage.from(SUPABASE_BUCKET).remove(paths);
+      }
+
+      const { error } = await supabaseClient
+        .from("date_events")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+
+      if (error) {
+        throw error;
+      }
+
+      updateSyncBanner("Tous les rendez-vous ont ete supprimes sur Supabase.", "success");
+    } catch (error) {
+      updateSyncBanner("Suppression Supabase en echec. Les donnees locales ont quand meme ete videes.", "error");
+    }
+  }
+
+  events = [];
+  saveEventsToLocal(events);
+  render();
+}
+
+function collectStoragePaths(list) {
+  return list
+    .flatMap((item) => [...(item.photos || []), ...(item.completionPhotos || [])])
+    .map(extractStoragePathFromPublicUrl)
+    .filter(Boolean);
+}
+
+function extractStoragePathFromPublicUrl(url) {
+  if (!url || !url.includes("/storage/v1/object/public/" + SUPABASE_BUCKET + "/")) {
+    return null;
+  }
+
+  return url.split("/storage/v1/object/public/" + SUPABASE_BUCKET + "/")[1] || null;
+}
+
+async function migrateLocalEventsToSupabase(localEvents) {
+  const migrated = [];
+
+  for (const item of localEvents) {
+    const normalized = normalizeEvent(item);
+    normalized.photos = await uploadStoredPhotosToStorage(normalized.photos, normalized.id, "planned");
+    normalized.completionPhotos = await uploadStoredPhotosToStorage(normalized.completionPhotos, normalized.id, "completed");
+    await insertEventToSupabase(normalized);
+    migrated.push(normalized);
+  }
+
+  saveEventsToLocal(migrated);
+  return migrated;
+}
+
+async function uploadFilesToStorage(files, eventId, folder) {
+  if (!supabaseClient || !files.length) {
+    return [];
+  }
+
+  const uploaded = [];
+
+  for (const file of files) {
+    const extension = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = eventId + "/" + folder + "/" + Date.now() + "-" + crypto.randomUUID() + "." + extension;
+    const { error } = await supabaseClient.storage
+      .from(SUPABASE_BUCKET)
+      .upload(path, file, {
+        cacheControl: "3600",
+        upsert: false
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const { data } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
+    uploaded.push(data.publicUrl);
+  }
+
+  return uploaded;
+}
+
+async function uploadStoredPhotosToStorage(photos, eventId, folder) {
+  if (!supabaseClient || !Array.isArray(photos) || !photos.length) {
+    return Array.isArray(photos) ? photos : [];
+  }
+
+  const uploaded = [];
+
+  for (const photo of photos) {
+    if (photo.startsWith("http")) {
+      uploaded.push(photo);
+      continue;
+    }
+
+    if (!photo.startsWith("data:")) {
+      uploaded.push(photo);
+      continue;
+    }
+
+    const blob = dataUrlToBlob(photo);
+    const extension = getExtensionFromMime(blob.type);
+    const path = eventId + "/" + folder + "/" + Date.now() + "-" + crypto.randomUUID() + "." + extension;
+    const { error } = await supabaseClient.storage
+      .from(SUPABASE_BUCKET)
+      .upload(path, blob, {
+        contentType: blob.type,
+        cacheControl: "3600",
+        upsert: false
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const { data } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
+    uploaded.push(data.publicUrl);
+  }
+
+  return uploaded;
+}
+
+function dataUrlToBlob(dataUrl) {
+  const parts = dataUrl.split(",");
+  const mimeMatch = parts[0].match(/data:(.*?);base64/);
+  const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+  const binary = atob(parts[1]);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Blob([bytes], { type: mimeType });
+}
+
+function getExtensionFromMime(mimeType) {
+  if (mimeType === "image/png") {
+    return "png";
+  }
+
+  if (mimeType === "image/webp") {
+    return "webp";
+  }
+
+  if (mimeType === "image/gif") {
+    return "gif";
+  }
+
+  return "jpg";
+}
+
+function updateSyncBanner(message, state) {
+  syncBanner.textContent = message;
+  syncBanner.classList.remove("is-error", "is-success");
+
+  if (state === "error") {
+    syncBanner.classList.add("is-error");
+  }
+
+  if (state === "success") {
+    syncBanner.classList.add("is-success");
+  }
 }
 
 function fileToDataUrl(file) {
@@ -1185,7 +1520,20 @@ async function completeEvent(eventId) {
   currentEvent.completionNote = completionNote;
   currentEvent.completionPhotos = completionPhotos;
 
-  saveEvents();
+  if (supabaseClient) {
+    try {
+      currentEvent.completionPhotos = await uploadFilesToStorage(completionFiles, currentEvent.id, "completed");
+      await updateEventInSupabase(currentEvent);
+      saveEventsToLocal(events);
+      updateSyncBanner("Rendez-vous termine synchronise avec Supabase.", "success");
+    } catch (error) {
+      updateSyncBanner("La validation cloud a echoue. Les donnees restent locales pour l'instant.", "error");
+      saveEventsToLocal(events);
+    }
+  } else {
+    saveEventsToLocal(events);
+  }
+
   render();
 }
 
@@ -1208,9 +1556,14 @@ function setupAccessLock() {
   window.setTimeout(() => accessCodeInput.focus(), 60);
 }
 
-setupAccessLock();
-initializeMap();
-render();
+async function initApp() {
+  setupAccessLock();
+  initializeMap();
+  events = await loadEvents();
+  render();
+}
+
+initApp();
 </script>
 </body>
 </html>

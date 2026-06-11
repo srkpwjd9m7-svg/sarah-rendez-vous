@@ -20,6 +20,8 @@ Le site est actuellement une application front simple, sans backend, base de don
 
 Les donnees sont enregistrees dans le navigateur avec `localStorage` et l'acces temporaire au site est memorise dans `sessionStorage`.
 
+Le projet est maintenant prepare pour une sauvegarde distante avec Supabase, mais cette partie n'est activee que si [supabase-config.js](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-config.js) contient de vrais identifiants.
+
 Cela veut dire :
 
 - les rendez-vous sont conserves sur le navigateur utilise
@@ -93,17 +95,30 @@ Le site affiche un calendrier du mois avec :
 - les jours du mois
 - un indicateur sur les jours ou un rendez-vous existe
 
+### 7. Synchronisation Supabase
+
+Le projet contient maintenant une integration Supabase pour :
+
+- sauvegarder les rendez-vous en ligne
+- sauvegarder les photos dans un bucket de stockage
+- relire les rendez-vous depuis plusieurs appareils
+- migrer automatiquement les donnees locales si Supabase est vide
+
+Si Supabase n'est pas configure, le site repasse en mode local.
+
 ## Structure du projet
 
 ```text
 .
+├── README.md
+├── SUPABASE_SETUP.md
 ├── index.html
 ├── rdv.html
+├── supabase-config.js
+├── supabase-setup.sql
 └── assets/
-    └── leaflet/
-        ├── leaflet.css
-        ├── leaflet.js
-        └── images/
+    ├── leaflet/
+    └── supabase/
 ```
 
 ### Fichiers principaux
@@ -116,6 +131,18 @@ Le site affiche un calendrier du mois avec :
 
 - `assets/leaflet/`
   copie locale de Leaflet pour eviter les erreurs de chargement externes
+
+- `assets/supabase/`
+  client Supabase embarque localement pour GitHub Pages
+
+- `supabase-config.js`
+  fichier de configuration du projet Supabase
+
+- `supabase-setup.sql`
+  script SQL pour creer la table, le bucket et les policies
+
+- `SUPABASE_SETUP.md`
+  guide pas a pas pour brancher Supabase
 
 ## Choix techniques
 
@@ -153,6 +180,14 @@ Aujourd'hui :
 
 Ce choix permet d'avoir une vraie selection de point sans cle API Google Maps.
 
+### Sauvegarde distante
+
+Le projet est prepare pour utiliser :
+
+- [Supabase](https://supabase.com/docs/reference/javascript/initializing) pour la base et le stockage
+- [Supabase Storage](https://supabase.com/docs/guides/storage) pour les photos
+- des policies SQL de base pour un fonctionnement sans compte utilisateur
+
 ## Donnees enregistrees
 
 Chaque rendez-vous enregistre contient actuellement une structure proche de :
@@ -172,6 +207,8 @@ Chaque rendez-vous enregistre contient actuellement une structure proche de :
   completionPhotos
 }
 ```
+
+Quand Supabase est actif, ces donnees sont stockees dans la table `date_events`.
 
 ## Fonctionnement local
 
@@ -193,6 +230,15 @@ Le projet est publie sur GitHub Pages.
 - site en ligne :
   [https://srkpwjd9m7-svg.github.io/sarah-rendez-vous/](https://srkpwjd9m7-svg.github.io/sarah-rendez-vous/)
 
+## Activation de Supabase
+
+Pour activer la vraie sauvegarde en ligne :
+
+1. ouvrir [SUPABASE_SETUP.md](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/SUPABASE_SETUP.md)
+2. remplir [supabase-config.js](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-config.js)
+3. executer [supabase-setup.sql](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-setup.sql) dans Supabase
+4. republier le site
+
 ## Limites actuelles
 
 - pas de synchronisation entre plusieurs appareils
@@ -201,6 +247,15 @@ Le projet est publie sur GitHub Pages.
 - pas de modification ou suppression d'un rendez-vous termine
 - le code d'acces est visible dans le code source
 - les donnees peuvent etre perdues si le stockage local du navigateur est vide
+
+Ces limites changent partiellement quand Supabase est configure :
+
+- la synchro multi-appareils devient possible
+- les photos peuvent etre conservees en ligne
+
+Mais il reste une limite importante :
+
+- sans authentification utilisateur, la securite de la base reste basique
 
 ## Pistes d'evolution
 
@@ -222,6 +277,7 @@ Le projet est volontairement simple et facile a modifier.
 Les parties les plus importantes a surveiller sont :
 
 - la logique de stockage local
+- la logique de bascule local / Supabase
 - la logique de separation `a venir / termines`
 - la logique de carte et de reverse geocoding
 - la protection par code
