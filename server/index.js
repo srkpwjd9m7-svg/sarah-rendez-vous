@@ -52,6 +52,17 @@ db.exec(`
   END;
 `);
 
+// Migrations idempotentes : ajout des colonnes pour la maquette
+// (heure, note, état d'acceptation d'une invitation)
+function addColumnIfMissing(sql) {
+  try { db.exec(sql); } catch (e) {
+    if (!/duplicate column name/i.test(String(e && e.message))) throw e;
+  }
+}
+addColumnIfMissing("ALTER TABLE date_events ADD COLUMN event_time TEXT DEFAULT ''");
+addColumnIfMissing("ALTER TABLE date_events ADD COLUMN rating INTEGER NOT NULL DEFAULT 0");
+addColumnIfMissing("ALTER TABLE date_events ADD COLUMN accepted INTEGER NOT NULL DEFAULT 1");
+
 // ---------- Helpers ----------
 const ACCESS_CODE_BUF = Buffer.from(ACCESS_CODE, 'utf8');
 
@@ -80,12 +91,15 @@ function rowToEvent(row) {
     id: row.id,
     title: row.title,
     event_date: row.event_date,
+    event_time: row.event_time ?? '',
     location: row.location,
     coordinates: parseJSON(row.coordinates, null),
     map_link: row.map_link,
     note: row.note ?? '',
     photos: parseJSON(row.photos, []),
     completed: !!row.completed,
+    accepted: row.accepted == null ? true : !!row.accepted,
+    rating: row.rating ?? 0,
     completion_note: row.completion_note ?? '',
     completion_photos: parseJSON(row.completion_photos, []),
     created_at: row.created_at,
@@ -95,8 +109,9 @@ function rowToEvent(row) {
 
 // Champs autorisés pour create/patch
 const WRITABLE_FIELDS = [
-  'title', 'event_date', 'location', 'coordinates', 'map_link',
-  'note', 'photos', 'completed', 'completion_note', 'completion_photos',
+  'title', 'event_date', 'event_time', 'location', 'coordinates', 'map_link',
+  'note', 'photos', 'completed', 'accepted', 'rating',
+  'completion_note', 'completion_photos',
 ];
 
 function normalizeForDb(field, value) {
@@ -108,7 +123,8 @@ function normalizeForDb(field, value) {
     if (value == null) return '[]';
     return typeof value === 'string' ? value : JSON.stringify(value);
   }
-  if (field === 'completed') return value ? 1 : 0;
+  if (field === 'completed' || field === 'accepted') return value ? 1 : 0;
+  if (field === 'rating') return Math.max(0, Math.min(5, parseInt(value, 10) || 0));
   return value;
 }
 
