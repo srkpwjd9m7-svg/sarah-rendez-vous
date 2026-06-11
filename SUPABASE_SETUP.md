@@ -4,11 +4,11 @@ Ce fichier explique comment brancher le projet a Supabase pour que les rendez-vo
 
 ## Ce que le projet attend
 
-Le site charge la configuration depuis [supabase-config.js](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-config.js).
+Le site charge la configuration depuis [supabase-config.js](supabase-config.js).
 
 Le point d'entree principal du site est maintenant :
 
-- [index.html](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/index.html)
+- [index.html](index.html)
 
 Le site reste bloque sur cette page tant que le mot de passe n'est pas entre.
 
@@ -34,19 +34,19 @@ Depuis le dashboard Supabase :
 - `Project URL`
 - `anon` ou `publishable key`
 
-Puis colle-les dans [supabase-config.js](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-config.js).
+Puis colle-les dans [supabase-config.js](supabase-config.js).
 
 Etat actuel du projet :
 
 - `Project URL` deja configure
 - cle publique deja configuree
-- [supabase-setup.sql](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-setup.sql) a ete execute
+- [supabase-setup.sql](supabase-setup.sql) a ete execute
 - la table `date_events` repond
 - le bucket `date-memories` repond
 
 ### 3. Creer la table et le bucket
 
-Ouvre le SQL Editor Supabase et execute le contenu de [supabase-setup.sql](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-setup.sql).
+Ouvre le SQL Editor Supabase et execute le contenu de [supabase-setup.sql](supabase-setup.sql).
 
 Ce script cree :
 
@@ -54,9 +54,17 @@ Ce script cree :
 - le bucket `date-memories`
 - les policies minimales pour ce projet
 
-### 4. Republier le site
+### 4. Deployer
 
-Une fois la configuration remplie, le site utilisera Supabase automatiquement.
+Pousser la nouvelle configuration sur `main` :
+
+```bash
+git add supabase-config.js
+git commit -m "chore: update supabase config"
+git push origin main
+```
+
+Le webhook GitHub declenche le deploy sur `lab.bourdat.fr/rdv` en ~2-5 s (5 min max via le cron de secours). Voir la section CI/CD du [README.md](README.md#mise-en-ligne-cicd).
 
 ## Important
 

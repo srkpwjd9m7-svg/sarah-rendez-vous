@@ -20,7 +20,7 @@ Le site est actuellement une application front simple, sans backend, base de don
 
 Les donnees sont enregistrees dans le navigateur avec `localStorage` et l'acces temporaire au site est memorise dans `sessionStorage`.
 
-Le projet est maintenant prepare pour une sauvegarde distante avec Supabase, mais cette partie n'est activee que si [supabase-config.js](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-config.js) contient de vrais identifiants.
+Le projet est maintenant prepare pour une sauvegarde distante avec Supabase, mais cette partie n'est activee que si [supabase-config.js](supabase-config.js) contient de vrais identifiants.
 
 Les identifiants Supabase du projet sont maintenant renseignes dans la configuration locale du site. Il reste encore a executer le script SQL de preparation pour que la base et le stockage soient vraiment operationnels.
 
@@ -31,7 +31,7 @@ Cela veut dire :
 - les rendez-vous sont conserves sur le navigateur utilise
 - les photos sont stockees localement dans ce navigateur
 - si on change d'appareil ou de navigateur, les donnees ne suivent pas
-- le site est statique et heberge via GitHub Pages
+- le site est statique et heberge sur le serveur `atlas.bourdat.fr` derriere Caddy, expose sur `https://lab.bourdat.fr/rdv/`
 
 ## Fonctionnalites
 
@@ -151,7 +151,7 @@ Si Supabase n'est pas configure, le site repasse en mode local.
   copie locale de Leaflet pour eviter les erreurs de chargement externes
 
 - `assets/supabase/`
-  client Supabase embarque localement pour GitHub Pages
+  client Supabase embarque localement (le site est servi en statique, sans bundler)
 
 - `supabase-config.js`
   fichier de configuration du projet Supabase
@@ -230,33 +230,110 @@ Quand Supabase est actif, ces donnees sont stockees dans la table `date_events`.
 
 ## Fonctionnement local
 
-Pour ouvrir le projet en local :
+Le projet ne demande pas de build ni d'installation npm. Le site est servi tel quel : `index.html`, `app.html`, `login.html`, `rdv.html`, `assets/`, `supabase-config.js` doivent rester pretes a l'emploi a la racine du repo.
 
-1. ouvrir `index.html`
-2. entrer le code d'acces
-3. acceder au site apres debloquage
-4. ajouter ou consulter les rendez-vous
+```bash
+# 1. Clone
+git clone https://github.com/srkpwjd9m7-svg/sarah-rendez-vous.git
+cd sarah-rendez-vous
 
-Le projet ne demande pas de build ni d'installation npm.
+# 2. Dev local : ouvrir index.html directement,
+#    ou servir avec un mini serveur (recommande pour Supabase + fetch)
+python3 -m http.server 8000
+# -> http://localhost:8000
+```
 
-## Mise en ligne
+Workflow type :
 
-Le projet est publie sur GitHub Pages.
+```bash
+git checkout -b feat/ma-modif
+# ... edits ...
+git add . && git commit -m "feat: ..."
+git push origin feat/ma-modif         # ne deploie PAS
+```
 
-- depot GitHub :
-  [srkpwjd9m7-svg/sarah-rendez-vous](https://github.com/srkpwjd9m7-svg/sarah-rendez-vous)
+## Mise en ligne (CI/CD)
 
-- site en ligne :
-  [https://srkpwjd9m7-svg.github.io/sarah-rendez-vous/](https://srkpwjd9m7-svg.github.io/sarah-rendez-vous/)
+### Depot et URL prod
+
+- depot GitHub : [srkpwjd9m7-svg/sarah-rendez-vous](https://github.com/srkpwjd9m7-svg/sarah-rendez-vous)
+- site en ligne : [https://lab.bourdat.fr/rdv/](https://lab.bourdat.fr/rdv/)
+- serveur : `atlas.bourdat.fr`, repertoire `/var/www/sarah-rdv/`, servi par Caddy
+- pas de build : les fichiers du repo sont servis tels quels
+
+### Regle de branche
+
+Seule la branche `main` est deployee. Les autres branches peuvent etre pushees librement sur GitHub, rien ne bouge en prod tant qu'il n'y a pas de merge / push sur `main`.
+
+```bash
+git checkout main
+git merge feat/ma-modif
+git push origin main                  # -> webhook fire, site a jour en ~2-5 s
+                                      # + Telegram "Deployed ✅" + message du commit
+```
+
+### Triggers de deploiement
+
+Deux chemins convergent vers le meme script `/home/atlas/cron_notify.sh`, qui appelle `sarah-rdv-deploy.sh` :
+
+1. **Webhook GitHub** : a chaque push, GitHub appelle `https://lab.bourdat.fr/hooks/sarah-rdv` (signature HMAC SHA-256).
+   - `ref == refs/heads/main` : deploy immediat
+   - autre branche : ignore (HTTP 204), silencieux sur Telegram
+2. **Cron 5 min** : `*/5 * * * *` sur le serveur, poll `origin/main`. Filet de securite si le webhook tombe ou si GitHub a un incident.
+
+### Ce que fait le script de deploy (`sarah-rdv-deploy.sh`)
+
+```bash
+cd /var/www/sarah-rdv
+git fetch origin main
+# si HEAD == origin/main : no-op silencieux, exit 0
+# sinon :
+git reset --hard origin/main          # ecrase tout changement local serveur
+chown -R atlas:atlas .
+# notification Telegram "deployed" + message du dernier commit
+```
+
+La prod n'est jamais modifiee a la main : tout `git reset --hard origin/main` ecrase ce qui traine localement sur le serveur.
+
+### Notifications Telegram
+
+Bot `@Atlas69_bot`, chat `342255581`.
+
+| Cas | Telegram |
+| --- | --- |
+| Cron tick, pas de nouveau commit | silencieux (rien) |
+| Cron tick, nouveau commit deploye | `lab.bourdat.fr/rdv - Deployed ✅` + 🚀 `deployed` + message du commit |
+| Webhook GitHub push sur `main` | `lab.bourdat.fr/rdv (webhook) - Deployed ✅` + 🚀 `deployed` + message du commit |
+| Webhook push sur autre branche | silencieux (HTTP 204, ignore) |
+| Deploy echoue (n'importe quel trigger) | `… - Failed to deploy ❌` |
+
+### Verifier qu'un deploy est passe
+
+- Telegram (instantane)
+- `ssh root@atlas.bourdat.fr 'tail /var/log/sarah-rdv-deploy.log'`
+- `curl -sI https://lab.bourdat.fr/rdv/ | grep last-modified`
+- logs webhook : `ssh root@atlas.bourdat.fr 'journalctl -u sarah-rdv-webhook -n 30'`
+
+Delai prod apres `git push origin main` : ~2-5 s via webhook ; 5 min max si webhook KO (cron de secours).
+
+### Rollback manuel si un push casse la prod
+
+```bash
+ssh root@atlas.bourdat.fr
+cd /var/www/sarah-rdv
+git reset --hard HEAD~1   # ou un sha precis
+```
+
+Le serveur sera reecrase au prochain push sur `main`, donc penser a faire un revert cote GitHub aussi.
 
 ## Activation de Supabase
 
 Pour activer la vraie sauvegarde en ligne :
 
-1. ouvrir [SUPABASE_SETUP.md](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/SUPABASE_SETUP.md)
-2. remplir [supabase-config.js](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-config.js)
-3. executer [supabase-setup.sql](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-setup.sql) dans Supabase
-4. republier le site
+1. ouvrir [SUPABASE_SETUP.md](SUPABASE_SETUP.md)
+2. remplir [supabase-config.js](supabase-config.js)
+3. executer [supabase-setup.sql](supabase-setup.sql) dans Supabase
+4. pousser sur `main` (le deploy se declenche automatiquement, voir [Mise en ligne (CI/CD)](#mise-en-ligne-cicd))
 
 Etat actuel :
 
@@ -340,3 +417,4 @@ Les parties les plus importantes a surveiller sont :
 Souhait utilisateur pour la suite :
 
 - pousser les modifications sur GitHub automatiquement apres les changements, sans redemander confirmation
+- tout push sur `main` declenche un deploy auto sur `lab.bourdat.fr/rdv` (voir [Mise en ligne (CI/CD)](#mise-en-ligne-cicd)) ; travailler sur des branches `feat/*` tant que la modif n'est pas validee pour la prod
