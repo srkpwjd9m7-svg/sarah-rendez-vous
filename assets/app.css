@@ -4,7 +4,91 @@
    cadre "phone" décoratif uniquement sur desktop large.
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Nunito:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Caveat:wght@500;600;700&display=swap');
+/* Self-hosted Google Fonts (DM Serif Display + Nunito + Caveat) */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(fonts/Wnz6HAc5bAfYB2QLZDwfqg4.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(fonts/Wnz6HAc5bAfYB2QLZDwfqg4.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(fonts/Wnz6HAc5bAfYB2QLZDwfqg4.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'DM Serif Display';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/-nFhOHM81r4j6k0gjAW3mujVU2B2G_Vx0vrx52g.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'DM Serif Display';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/-nFnOHM81r4j6k0gjAW3mujVU2B2K_J71djz.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/XRXX3I6Li01BKofIMOaBTMnFcQ.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: italic;
+  font-weight: 600;
+  font-display: swap;
+  src: url(fonts/XRXX3I6Li01BKofIMOaBTMnFcQ.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/XRXV3I6Li01BKof4N-yGbss.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(fonts/XRXV3I6Li01BKof4N-yGbss.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(fonts/XRXV3I6Li01BKof4N-yGbss.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(fonts/XRXV3I6Li01BKof4N-yGbss.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url(fonts/XRXV3I6Li01BKof4N-yGbss.woff2) format('woff2');
+}
 
 :root{
   --bg: #fff7ef;
