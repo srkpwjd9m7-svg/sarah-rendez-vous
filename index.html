@@ -396,6 +396,10 @@ button:hover{
   box-shadow:0 12px 24px rgba(110,54,68,0.08);
 }
 
+.event-card.is-completed{
+  background:linear-gradient(180deg, rgba(255,251,246,0.98), rgba(255,243,233,0.95));
+}
+
 .event-top{
   display:flex;
   justify-content:space-between;
@@ -498,6 +502,35 @@ button:hover{
 
 .map-link:hover{
   text-decoration:underline;
+}
+
+.event-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:14px;
+}
+
+.event-note-box{
+  margin-top:14px;
+  padding:14px;
+  border-radius:18px;
+  background:rgba(227,109,109,0.08);
+}
+
+.event-note-box textarea,
+.event-note-box input{
+  margin-top:10px;
+}
+
+.event-columns{
+  display:grid;
+  gap:18px;
+}
+
+.event-group-title{
+  margin:0 0 10px;
+  font-size:1.05rem;
 }
 
 @media (max-width: 920px){
@@ -664,7 +697,16 @@ button:hover{
           <div class="section-title">
             <h2>Souvenirs et sorties</h2>
           </div>
-          <div class="events" id="events"></div>
+          <div class="event-columns">
+            <div>
+              <h3 class="event-group-title">Rendez-vous a venir</h3>
+              <div class="events" id="events-upcoming"></div>
+            </div>
+            <div>
+              <h3 class="event-group-title">Rendez-vous termines</h3>
+              <div class="events" id="events-completed"></div>
+            </div>
+          </div>
         </div>
       </section>
     </section>
@@ -677,7 +719,8 @@ const ACCESS_CODE = "01052021";
 const ACCESS_STORAGE_KEY = "nos-rendez-vous-access-ok";
 const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org";
 const form = document.getElementById("event-form");
-const eventsContainer = document.getElementById("events");
+const upcomingEventsContainer = document.getElementById("events-upcoming");
+const completedEventsContainer = document.getElementById("events-completed");
 const calendarContainer = document.getElementById("calendar");
 const monthLabel = document.getElementById("month-label");
 const monthPill = document.getElementById("month-pill");
@@ -746,7 +789,10 @@ form.addEventListener("submit", async (event) => {
     coordinates: selectedCoordinates,
     mapLink: mapLink || buildGoogleMapsSearchUrl(location),
     note,
-    photos
+    photos,
+    completed: false,
+    completionNote: "",
+    completionPhotos: []
   });
 
   saveEvents();
@@ -818,7 +864,10 @@ function seedEvents() {
       coordinates: { lat: 45.7578, lng: 4.8320 },
       mapLink: buildGoogleMapsSearchUrl("Lyon"),
       note: "Une promenade tranquille, un chocolat chaud et du temps rien qu'a nous.",
-      photos: []
+      photos: [],
+      completed: false,
+      completionNote: "",
+      completionPhotos: []
     }
   ];
 
@@ -965,7 +1014,7 @@ async function reverseGeocode(lat, lng) {
 function getUpcomingEvent(sortedEvents) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  return sortedEvents.find((item) => new Date(item.date + "T12:00:00") >= today) || sortedEvents[0];
+  return sortedEvents.find((item) => !item.completed && new Date(item.date + "T12:00:00") >= today) || sortedEvents.find((item) => !item.completed) || sortedEvents[0];
 }
 
 function renderStats(sortedEvents) {
@@ -1025,25 +1074,66 @@ function renderCalendar(sortedEvents) {
 }
 
 function renderEvents(sortedEvents) {
-  if (!sortedEvents.length) {
-    eventsContainer.innerHTML = '<div class="empty">Aucun rendez-vous pour le moment. Cree le premier juste a gauche.</div>';
-    return;
-  }
+  const upcomingEvents = sortedEvents.filter((item) => !item.completed);
+  const completedEvents = sortedEvents.filter((item) => item.completed).reverse();
 
-  eventsContainer.innerHTML = sortedEvents.map((item) => `
+  if (!upcomingEvents.length) {
+    upcomingEventsContainer.innerHTML = '<div class="empty">Aucun rendez-vous a venir pour le moment.</div>';
+  } else {
+    upcomingEventsContainer.innerHTML = upcomingEvents.map((item) => `
     <article class="event-card">
       <div class="event-top">
         <div>
           <h3>${escapeHtml(item.title)}</h3>
           <p class="meta">📅 ${escapeHtml(formatDate(item.date))}<br>📍 ${escapeHtml(item.location)}</p>
         </div>
-        <span class="tag">${isFuture(item.date) ? "A venir" : "Souvenir"}</span>
+        <span class="tag">${isFuture(item.date) ? "A venir" : "A valider"}</span>
       </div>
       <a class="map-link" href="${escapeAttribute(item.mapLink || buildGoogleMapsSearchUrl(item.location))}" target="_blank" rel="noopener noreferrer">Voir sur Google Maps</a>
       ${item.note ? `<p class="memory">${escapeHtml(item.note)}</p>` : ""}
       ${item.photos.length ? `
         <div class="photos">
           ${item.photos.map((photo, index) => `<img src="${photo}" alt="Souvenir ${index + 1} de ${escapeHtml(item.title)}">`).join("")}
+        </div>
+      ` : ""}
+      <div class="event-note-box">
+        <label>
+          Mot de fin de rendez-vous
+          <textarea id="completion-note-${item.id}" placeholder="Ex: C'etait trop bien, on veut refaire ca."></textarea>
+        </label>
+        <label>
+          Photo(s) de fin de rendez-vous
+          <input type="file" id="completion-photos-${item.id}" accept="image/*" multiple>
+        </label>
+        <div class="event-actions">
+          <button type="button" class="primary" onclick="completeEvent('${escapeAttribute(item.id)}')">Valider ce rendez-vous</button>
+        </div>
+      </div>
+    </article>
+  `).join("");
+  }
+
+  if (!completedEvents.length) {
+    completedEventsContainer.innerHTML = '<div class="empty">Les rendez-vous termines apparaitront ici avec leurs souvenirs.</div>';
+    return;
+  }
+
+  completedEventsContainer.innerHTML = completedEvents.map((item) => `
+    <article class="event-card is-completed">
+      <div class="event-top">
+        <div>
+          <h3>${escapeHtml(item.title)}</h3>
+          <p class="meta">📅 ${escapeHtml(formatDate(item.date))}<br>📍 ${escapeHtml(item.location)}</p>
+        </div>
+        <span class="tag">Termine</span>
+      </div>
+      <a class="map-link" href="${escapeAttribute(item.mapLink || buildGoogleMapsSearchUrl(item.location))}" target="_blank" rel="noopener noreferrer">Voir sur Google Maps</a>
+      ${item.note ? `<p class="memory">${escapeHtml(item.note)}</p>` : ""}
+      ${item.completionNote ? `<p class="memory"><strong>Souvenir:</strong> ${escapeHtml(item.completionNote)}</p>` : ""}
+      ${(item.photos.length || item.completionPhotos.length) ? `
+        <div class="photos">
+          ${item.photos.map((photo, index) => `<img src="${photo}" alt="Souvenir initial ${index + 1} de ${escapeHtml(item.title)}">`).join("")}
+          ${item.completionPhotos.map((photo, index) => `<img src="${photo}" alt="Photo finale ${index + 1} de ${escapeHtml(item.title)}">`).join("")}
         </div>
       ` : ""}
     </article>
@@ -1068,6 +1158,29 @@ function escapeHtml(value) {
 function escapeAttribute(value) {
   return escapeHtml(value);
 }
+
+async function completeEvent(eventId) {
+  const currentEvent = events.find((item) => item.id === eventId);
+
+  if (!currentEvent) {
+    return;
+  }
+
+  const noteField = document.getElementById("completion-note-" + eventId);
+  const photoField = document.getElementById("completion-photos-" + eventId);
+  const completionNote = noteField ? noteField.value.trim() : "";
+  const completionFiles = photoField ? Array.from(photoField.files) : [];
+  const completionPhotos = await Promise.all(completionFiles.map(fileToDataUrl));
+
+  currentEvent.completed = true;
+  currentEvent.completionNote = completionNote;
+  currentEvent.completionPhotos = completionPhotos;
+
+  saveEvents();
+  render();
+}
+
+window.completeEvent = completeEvent;
 
 function render() {
   const sortedEvents = sortEvents();
