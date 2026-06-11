@@ -53,7 +53,7 @@ sudo systemctl enable --now sarah-rdv-demo-api.service
 sudo journalctl -u sarah-rdv-demo-api.service -n 30 --no-pager
 
 # 6. Smoke-test
-curl -s http://127.0.0.1:9093/api/health
+curl -s http://127.0.0.1:9094/api/health
 curl -sI https://lab.bourdat.fr/rdv-demo/   # should be 200, no 302 to /login
 ```
 
@@ -64,10 +64,10 @@ Add the three blocks below **before** the existing `handle /rdv/*` block
 `/rdv/*`, but keeping them together is easier to read).
 
 ```caddy
-# ─── /rdv-demo/api/* : demo backend (port 9093), NO forward_auth ───
+# ─── /rdv-demo/api/* : demo backend (port 9094), NO forward_auth ───
 handle /rdv-demo/api/* {
     uri strip_prefix /rdv-demo
-    reverse_proxy 127.0.0.1:9093 {
+    reverse_proxy 127.0.0.1:9094 {
         header_up X-Forwarded-Prefix /rdv-demo
     }
 }
