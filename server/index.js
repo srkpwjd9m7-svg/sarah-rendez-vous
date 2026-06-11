@@ -13,6 +13,11 @@ const ACCESS_CODE = process.env.ACCESS_CODE;
 const DATA_DIR = process.env.DATA_DIR || '/var/lib/sarah-rdv';
 const PORT = parseInt(process.env.PORT || '9092', 10);
 const HOST = process.env.HOST || '127.0.0.1';
+// Public URL prefix for served photos. Defaults to the production mount.
+// The demo instance sets this to '/rdv-demo/media' so uploads return URLs
+// that resolve under the demo's Caddy route.
+const MEDIA_URL_PREFIX = (process.env.MEDIA_URL_PREFIX || '/rdv/media').replace(/\/+$/, '');
+const MEDIA_URL_REGEX = new RegExp('^' + MEDIA_URL_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '/([A-Za-z0-9._-]+)$');
 
 if (!ACCESS_CODE || typeof ACCESS_CODE !== 'string' || ACCESS_CODE.length === 0) {
   console.error('[FATAL] ACCESS_CODE env var is required and must be non-empty.');
@@ -243,8 +248,8 @@ app.delete('/api/events/:id', (req, res, next) => {
 
     for (const u of urls) {
       if (typeof u !== 'string') continue;
-      // n'efface que ce qui est servi par notre API (/rdv/media/<filename>)
-      const m = u.match(/^\/rdv\/media\/([A-Za-z0-9._-]+)$/);
+      // n'efface que ce qui est servi par notre API (<MEDIA_URL_PREFIX>/<filename>)
+      const m = u.match(MEDIA_URL_REGEX);
       if (!m) continue;
       const filename = m[1];
       const full = path.join(PHOTOS_DIR, filename);
@@ -278,7 +283,7 @@ app.post('/api/photos', upload.single('file'), (req, res, next) => {
     const filename = `${crypto.randomUUID()}${ext}`;
     const full = path.join(PHOTOS_DIR, filename);
     fs.writeFileSync(full, req.file.buffer);
-    res.status(201).json({ url: `/rdv/media/${filename}` });
+    res.status(201).json({ url: `${MEDIA_URL_PREFIX}/${filename}` });
   } catch (err) {
     next(err);
   }

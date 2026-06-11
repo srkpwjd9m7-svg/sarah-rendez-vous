@@ -8,7 +8,10 @@
   'use strict';
 
   // ----- Config -----
-  const API_BASE = '/rdv/api';
+  // API_BASE is derived from the URL by the inline script in index.html
+  // (window.__rdvConfig) so that the same bundle serves both the production
+  // instance (/rdv/) and the public demo (/rdv-demo/).
+  const API_BASE = (window.__rdvConfig && window.__rdvConfig.apiBase) || '/rdv/api';
   const STORAGE_KEY = 'nos-rendez-vous-events';
   const ACCESS_CODE_KEY = 'nos-rendez-vous-access-code';
   const ACCESS_OK_KEY = 'nos-rendez-vous-access-ok';
@@ -34,6 +37,7 @@
     spark: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 6.4L20 10l-6.4 1.6L12 18l-1.6-6.4L4 10l6.4-1.6z"/></svg>',
     heart: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-6.5-4.8-9.2-9C1 9 2.5 5 6.2 5 9 5 10.5 7 12 9c1.5-2 3-4 5.8-4C21.5 5 23 9 21.2 12c-2.7 4.2-9.2 9-9.2 9z"/></svg>',
     logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>',
+    share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg>',
   };
 
   const WD = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -468,7 +472,8 @@
           ${e.status === 'toValidate'
             ? `<button class="btn btn-primary btn-sm" data-validate="${e.id}">${ICON.check} Valider le RDV</button>`
             : e.status === 'pending'
-            ? `<button class="btn btn-soft btn-sm" data-open-inv="${e.id}">${ICON.gift} Voir l'invitation</button>`
+            ? `<button class="btn btn-soft btn-sm" data-open-inv="${e.id}">${ICON.gift} Voir l'invitation</button>
+               <button class="btn btn-primary btn-sm" data-share-inv="${e.id}">${ICON.share} Partager</button>`
             : `<button class="btn btn-ghost btn-sm" data-edit="${e.id}">${ICON.edit} Modifier</button>`}
           <button class="btn btn-icon btn-sm" data-delete="${e.id}" title="Supprimer">${ICON.trash}</button>
         </div>
@@ -1110,6 +1115,48 @@
     mountInvitation(overlay, ev);
   }
 
+  // Build a public URL that opens directly on this invitation.
+  function invitationUrl(ev){
+    const cfg = window.__rdvConfig || {};
+    const base = cfg.basePath || '/rdv';
+    return location.origin + base + '/?inv=' + encodeURIComponent(ev.id);
+  }
+
+  function invitationShareText(ev){
+    const sweet = SWEET_LINES[Math.floor(Math.random() * SWEET_LINES.length)];
+    const when = fmtLong(ev.date) + (ev.time ? ' à ' + ev.time : '');
+    return `${sweet} j'ai une invitation pour toi ❤\n${ev.title} — ${when}\n📍 ${ev.location}`;
+  }
+
+  async function shareInvitation(id){
+    const ev = state.events.find(e => e.id === id);
+    if (!ev){ toast('Invitation introuvable'); return; }
+    const url = invitationUrl(ev);
+    const text = invitationShareText(ev);
+    const title = `Invitation : ${ev.title}`;
+
+    // Web Share API — mobile native sheet (WhatsApp, Insta DM, SMS, etc.)
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text, url });
+        return;
+      } catch (err) {
+        // AbortError = user dismissed the sheet, nothing to do.
+        if (err && err.name === 'AbortError') return;
+        // Otherwise fall through to clipboard.
+      }
+    }
+
+    // Desktop fallback : copy link.
+    try {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      toast('Lien copié — colle-le dans ta messagerie ❤');
+    } catch {
+      // Final fallback : prompt with the URL.
+      window.prompt('Copie ce lien pour partager l’invitation :', url);
+    }
+  }
+
   // ============================================================
   // EVENTS / NAV
   // ============================================================
@@ -1123,6 +1170,9 @@
     }
     const inv = e.target.closest('[data-open-inv]');
     if (inv) return openInvitationOverlay(inv.dataset.openInv);
+
+    const share = e.target.closest('[data-share-inv]');
+    if (share) return shareInvitation(share.dataset.shareInv);
 
     const val = e.target.closest('[data-validate]');
     if (val) return openValidate(val.dataset.validate);
@@ -1185,6 +1235,20 @@
 
     state.events = await loadEvents();
     render();
+
+    // Deep link : ?inv=<id> opens the invitation overlay directly.
+    // Used by shared links (Web Share API → WhatsApp/Insta/etc.).
+    try {
+      const params = new URLSearchParams(location.search);
+      const invId = params.get('inv');
+      if (invId && state.events.some(e => e.id === invId)) {
+        openInvitationOverlay(invId);
+        // Strip the query so a refresh doesn't re-open the modal.
+        params.delete('inv');
+        const qs = params.toString();
+        history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+      }
+    } catch {}
   }
 
   // Expose start so the lock screen can trigger it after auth

@@ -1,0 +1,52 @@
+# Demo instance of the sarah-rdv API.
+#
+# Runs the SAME node code as the production service (/opt/sarah-rdv-api/index.js),
+# but with a separate env file pointing at a separate DATA_DIR and a separate
+# PORT. ExecStartPre runs the seed-demo.js script, which wipes the demo DB and
+# reseeds dummy events at every (re)start.
+#
+# Install:
+#   sudo cp sarah-rdv-demo-api.service.example /etc/systemd/system/sarah-rdv-demo-api.service
+#   sudo cp sarah-rdv-demo-api.env.example     /etc/sarah-rdv-demo-api.env
+#   sudo chmod 600 /etc/sarah-rdv-demo-api.env
+#   sudo mkdir -p /var/lib/sarah-rdv-demo/photos
+#   sudo chown -R atlas:atlas /var/lib/sarah-rdv-demo
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now sarah-rdv-demo-api.service
+
+[Unit]
+Description=sarah-rdv DEMO API (Express + SQLite, dummy data, reset on restart)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=atlas
+Group=atlas
+WorkingDirectory=/opt/sarah-rdv-api
+EnvironmentFile=/etc/sarah-rdv-demo-api.env
+# Reseed the dummy DB at every start. DEMO_SEED=1 is required by the script
+# as a safety belt so it cannot accidentally wipe the production DB.
+ExecStartPre=/usr/bin/node /opt/sarah-rdv-api/seed-demo.js
+ExecStart=/usr/bin/node /opt/sarah-rdv-api/index.js
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+# Hardening (mirrors the production unit)
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/sarah-rdv-demo
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictNamespaces=true
+RestrictRealtime=true
+
+[Install]
+WantedBy=multi-user.target
