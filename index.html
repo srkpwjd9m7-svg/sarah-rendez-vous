@@ -964,6 +964,11 @@ async function loadEvents() {
     updateSyncBanner("Synchronisation Supabase active.", "success");
     return remoteEvents;
   } catch (error) {
+    if (error && error.code === "PGRST205") {
+      updateSyncBanner("Supabase est configure, mais la table date_events n'existe pas encore. Execute supabase-setup.sql dans le SQL Editor Supabase.", "error");
+      return localEvents;
+    }
+
     updateSyncBanner("Impossible de charger Supabase. Le site utilise temporairement les donnees locales.", "error");
     return localEvents;
   }

@@ -247,6 +247,8 @@ Etat actuel :
 - cle publique Supabase configuree
 - script SQL encore a executer dans Supabase
 
+Si le site affiche le message indiquant qu'il est impossible de charger Supabase, la cause la plus probable dans l'etat actuel est que la table `date_events` n'a pas encore ete creee. Il faut alors executer [supabase-setup.sql](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-setup.sql).
+
 ## Limites actuelles
 
 - pas de synchronisation entre plusieurs appareils
