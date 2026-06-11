@@ -95,9 +95,61 @@ les deux instances finissent toujours avec le même schéma.
 
 ### Ajouter une table
 
-Même principe : un bloc `CREATE TABLE IF NOT EXISTS <nom> (...)` en plus du
-schéma existant. Si elle remplace ou supprime une table existante, fais le
-backup avant (voir ci-dessous).
+Même principe que pour une colonne : ajoute un bloc `CREATE TABLE IF NOT
+EXISTS` dans le `db.exec(...)` initial de `index.js`, juste après le
+`CREATE TABLE date_events`. Il sera créé au prochain restart si la table
+n'existe pas, no-op sinon.
+
+```js
+db.exec(`
+  CREATE TABLE IF NOT EXISTS date_events ( ... );
+
+  -- Nouvelle table : commentaires liés à un event.
+  CREATE TABLE IF NOT EXISTS date_comments (
+    id TEXT PRIMARY KEY,
+    event_id TEXT NOT NULL REFERENCES date_events(id) ON DELETE CASCADE,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_date_comments_event_id
+    ON date_comments(event_id);
+`);
+```
+
+Points à ne pas oublier :
+
+- **`IF NOT EXISTS`** sur la table *et* sur chaque index. Sans ça, le 2ème
+  restart crashe avec `table already exists`.
+- **Foreign keys** : `index.js` active déjà `db.pragma('foreign_keys = ON')`
+  au démarrage, donc le `REFERENCES ... ON DELETE CASCADE` fonctionne tel
+  quel. Garde ça en tête si tu désactives le pragma quelque part.
+- **Index** : à ajouter dans le même `db.exec(...)` que la table, pour qu'ils
+  apparaissent en même temps sur les DB existantes (idempotent grâce au
+  `IF NOT EXISTS`).
+- **Triggers** : si tu ajoutes un trigger `updated_at` à la main (cf. celui
+  existant sur `date_events`), pareil : `CREATE TRIGGER IF NOT EXISTS`.
+- **Routes API** : la table seule ne sert à rien sans les `app.get/post/...`
+  qui la lisent et l'écrivent. Pense aussi à ajouter les champs sensibles
+  à un éventuel `WRITABLE_FIELDS` équivalent.
+- **Seed démo** : si la table doit contenir du dummy content en démo, étends
+  `seed-demo.js` — ajoute le `CREATE TABLE IF NOT EXISTS` *aussi* dedans (il
+  wipe la DB avant `index.js` ne tourne, donc il a besoin de connaître les
+  tables qu'il veut populater) et ajoute les `INSERT`.
+
+### Renommer / supprimer une table
+
+À éviter tant que possible — c'est destructif et SQLite ne gère pas ça
+proprement entre deux services qui écrivent. Si vraiment nécessaire :
+
+1. Backup `data.db` manuellement avant le push (voir plus bas).
+2. Code la migration comme une suite explicite : `CREATE TABLE new`,
+   `INSERT INTO new SELECT ... FROM old`, `DROP TABLE old`, `ALTER TABLE new
+   RENAME TO old`. Mets-la dans une fonction `runOnce()` gardée par une
+   table `_migrations(id TEXT PRIMARY KEY)` que tu coches après exécution,
+   sinon elle re-tourne à chaque restart.
+3. Sur démo, comme la DB est wipée à chaque restart, pas besoin de migration —
+   il suffit que `seed-demo.js` connaisse la nouvelle structure.
 
 ### Limites
 
