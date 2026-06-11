@@ -34,7 +34,9 @@ Etat actuel du projet :
 
 - `Project URL` deja configure
 - cle publique deja configuree
-- il reste surtout a executer [supabase-setup.sql](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-setup.sql)
+- [supabase-setup.sql](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-setup.sql) a ete execute
+- la table `date_events` repond
+- le bucket `date-memories` repond
 
 ### 3. Creer la table et le bucket
 

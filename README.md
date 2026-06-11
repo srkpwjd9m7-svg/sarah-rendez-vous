@@ -24,6 +24,8 @@ Le projet est maintenant prepare pour une sauvegarde distante avec Supabase, mai
 
 Les identifiants Supabase du projet sont maintenant renseignes dans la configuration locale du site. Il reste encore a executer le script SQL de preparation pour que la base et le stockage soient vraiment operationnels.
 
+La preparation SQL a maintenant ete executee et la connexion Supabase repond correctement.
+
 Cela veut dire :
 
 - les rendez-vous sont conserves sur le navigateur utilise
@@ -245,9 +247,11 @@ Etat actuel :
 
 - `Project URL` configure
 - cle publique Supabase configuree
-- script SQL encore a executer dans Supabase
+- script SQL execute dans Supabase
+- table `date_events` accessible
+- bucket `date-memories` accessible
 
-Si le site affiche le message indiquant qu'il est impossible de charger Supabase, la cause la plus probable dans l'etat actuel est que la table `date_events` n'a pas encore ete creee. Il faut alors executer [supabase-setup.sql](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-setup.sql).
+Si le site affiche encore un message d'erreur Supabase, ce ne sera normalement plus lie a l'absence de table ou de bucket, puisque ces elements repondent maintenant correctement.
 
 ## Limites actuelles
 
