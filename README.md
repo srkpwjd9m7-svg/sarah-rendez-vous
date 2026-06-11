@@ -322,6 +322,10 @@ Ameliorations naturelles pour la suite :
 
 Le projet est volontairement simple et facile a modifier.
 
+Historique Git :
+
+- l'historique des commits a ete realigne pour utiliser l'identite GitHub `srkpwjd9m7-svg`
+
 Les parties les plus importantes a surveiller sont :
 
 - la logique de stockage local
