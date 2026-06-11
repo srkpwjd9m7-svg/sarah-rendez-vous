@@ -37,11 +37,17 @@ Cela veut dire :
 
 ### 1. Protection par code
 
-Le site est bloque par un ecran d'acces au chargement.
+Le projet utilise maintenant deux pages separees :
+
+- `login.html` pour entrer le code
+- `app.html` pour acceder au site des rendez-vous
+
+La page principale `index.html` redirige vers `login.html`.
 
 - code actuel : `01052021`
-- si le bon code est saisi, l'utilisateur entre dans le site
+- si le bon code est saisi, l'utilisateur est redirige vers `app.html`
 - l'acces reste ouvert pour la session en cours
+- si on ouvre directement `app.html` sans session valide, la page renvoie vers `login.html`
 
 ### 2. Creation d'un rendez-vous
 
@@ -116,7 +122,9 @@ Si Supabase n'est pas configure, le site repasse en mode local.
 .
 ├── README.md
 ├── SUPABASE_SETUP.md
+├── app.html
 ├── index.html
+├── login.html
 ├── rdv.html
 ├── supabase-config.js
 ├── supabase-setup.sql
@@ -127,11 +135,17 @@ Si Supabase n'est pas configure, le site repasse en mode local.
 
 ### Fichiers principaux
 
+- `app.html`
+  page principale du site des rendez-vous
+
 - `index.html`
-  page principale du site
+  redirection vers la page de connexion
+
+- `login.html`
+  page de connexion avec le code secret
 
 - `rdv.html`
-  redirection simple vers `index.html`
+  redirection simple vers `login.html`
 
 - `assets/leaflet/`
   copie locale de Leaflet pour eviter les erreurs de chargement externes
@@ -218,9 +232,10 @@ Quand Supabase est actif, ces donnees sont stockees dans la table `date_events`.
 
 Pour ouvrir le projet en local :
 
-1. ouvrir `index.html`
+1. ouvrir `login.html` ou `index.html`
 2. entrer le code d'acces
-3. ajouter ou consulter les rendez-vous
+3. etre redirige vers `app.html`
+4. ajouter ou consulter les rendez-vous
 
 Le projet ne demande pas de build ni d'installation npm.
 
@@ -311,6 +326,7 @@ Les parties les plus importantes a surveiller sont :
 
 - la logique de stockage local
 - la logique de bascule local / Supabase
+- la logique de redirection `login.html -> app.html`
 - la logique de separation `a venir / termines`
 - la logique de carte et de reverse geocoding
 - la protection par code

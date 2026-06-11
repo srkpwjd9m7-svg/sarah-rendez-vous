@@ -6,6 +6,11 @@ Ce fichier explique comment brancher le projet a Supabase pour que les rendez-vo
 
 Le site charge la configuration depuis [supabase-config.js](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-config.js).
 
+Le flux utilisateur principal passe maintenant par :
+
+- [login.html](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/login.html)
+- puis [app.html](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/app.html)
+
 Il faut remplir :
 
 ```js
