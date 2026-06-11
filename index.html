@@ -65,6 +65,64 @@ body::after{
   padding:32px 0 48px;
 }
 
+.lock-screen{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  background:
+    radial-gradient(circle at top, rgba(255,244,214,0.28), transparent 28%),
+    linear-gradient(160deg, rgba(56,31,44,0.92), rgba(88,40,56,0.92));
+  backdrop-filter:blur(10px);
+}
+
+.lock-card{
+  width:min(100%, 420px);
+  padding:30px 24px;
+  border-radius:32px;
+  background:rgba(255,248,244,0.95);
+  box-shadow:0 22px 60px rgba(0,0,0,0.24);
+  text-align:center;
+}
+
+.lock-card h2{
+  margin:12px 0 10px;
+  font-size:1.9rem;
+}
+
+.lock-card p{
+  margin:0 0 18px;
+}
+
+.lock-icon{
+  font-size:2.3rem;
+}
+
+.lock-form{
+  display:grid;
+  gap:12px;
+}
+
+.lock-form input{
+  text-align:center;
+  letter-spacing:0.2em;
+  font-size:1.1rem;
+}
+
+.lock-error{
+  min-height:1.2em;
+  margin:0;
+  color:#b33b55;
+  font-size:0.92rem;
+}
+
+.is-hidden{
+  display:none;
+}
+
 .hero{
   position:relative;
   overflow:hidden;
@@ -476,6 +534,27 @@ button:hover{
 </style>
 </head>
 <body>
+  <div class="lock-screen" id="lock-screen">
+    <div class="lock-card">
+      <div class="lock-icon">♡</div>
+      <h2>Espace prive</h2>
+      <p>Entre le code secret pour ouvrir le site.</p>
+      <form class="lock-form" id="lock-form">
+        <input
+          type="password"
+          id="access-code"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="Code d'acces"
+          maxlength="8"
+          required
+        >
+        <button type="submit" class="primary">Entrer</button>
+        <p class="lock-error" id="lock-error"></p>
+      </form>
+    </div>
+  </div>
+
   <main class="page">
     <section class="hero">
       <span class="eyebrow">Notre agenda a deux</span>
@@ -594,6 +673,8 @@ button:hover{
 <script src="./assets/leaflet/leaflet.js"></script>
 <script>
 const STORAGE_KEY = "nos-rendez-vous-souvenirs";
+const ACCESS_CODE = "01052021";
+const ACCESS_STORAGE_KEY = "nos-rendez-vous-access-ok";
 const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org";
 const form = document.getElementById("event-form");
 const eventsContainer = document.getElementById("events");
@@ -609,6 +690,10 @@ const mapLinkInput = document.getElementById("map-link");
 const searchMapButton = document.getElementById("search-map");
 const useMapLinkButton = document.getElementById("use-map-link");
 const mapPreview = document.getElementById("map-preview");
+const lockScreen = document.getElementById("lock-screen");
+const lockForm = document.getElementById("lock-form");
+const accessCodeInput = document.getElementById("access-code");
+const lockError = document.getElementById("lock-error");
 
 const monthNames = [
   "Janvier", "Fevrier", "Mars", "Avril", "Mai", "Juin",
@@ -621,6 +706,21 @@ let events = loadEvents();
 let selectedCoordinates = null;
 let map = null;
 let marker = null;
+
+lockForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+
+  if (accessCodeInput.value === ACCESS_CODE) {
+    sessionStorage.setItem(ACCESS_STORAGE_KEY, "ok");
+    lockScreen.classList.add("is-hidden");
+    lockError.textContent = "";
+    accessCodeInput.value = "";
+    return;
+  }
+
+  lockError.textContent = "Code incorrect. Reessaie doucement.";
+  accessCodeInput.select();
+});
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -976,6 +1076,17 @@ function render() {
   renderEvents(sortedEvents);
 }
 
+function setupAccessLock() {
+  if (sessionStorage.getItem(ACCESS_STORAGE_KEY) === "ok") {
+    lockScreen.classList.add("is-hidden");
+    return;
+  }
+
+  lockScreen.classList.remove("is-hidden");
+  window.setTimeout(() => accessCodeInput.focus(), 60);
+}
+
+setupAccessLock();
 initializeMap();
 render();
 </script>
