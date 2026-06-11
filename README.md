@@ -20,18 +20,13 @@ Le site est actuellement une application front simple, sans backend, base de don
 
 Les donnees sont enregistrees dans le navigateur avec `localStorage` et l'acces temporaire au site est memorise dans `sessionStorage`.
 
-Le projet est maintenant prepare pour une sauvegarde distante avec Supabase, mais cette partie n'est activee que si [supabase-config.js](supabase-config.js) contient de vrais identifiants.
+Le projet utilise maintenant une API REST interne (servie sous `/rdv/api/`) pour la sauvegarde distante des rendez-vous et des photos.
 
-Les identifiants Supabase du projet sont maintenant renseignes dans la configuration locale du site. Il reste encore a executer le script SQL de preparation pour que la base et le stockage soient vraiment operationnels.
-
-La preparation SQL a maintenant ete executee et la connexion Supabase repond correctement.
-
-Cela veut dire :
+Si l'API est injoignable, le site bascule automatiquement en mode local :
 
 - les rendez-vous sont conserves sur le navigateur utilise
-- les photos sont stockees localement dans ce navigateur
 - si on change d'appareil ou de navigateur, les donnees ne suivent pas
-- le site est statique et heberge sur le serveur `atlas.bourdat.fr` derriere Caddy, expose sur `https://lab.bourdat.fr/rdv/`
+- le site est statique cote front et heberge via GitHub Pages
 
 ## Fonctionnalites
 
@@ -105,32 +100,29 @@ Le site affiche un calendrier du mois avec :
 - les jours du mois
 - un indicateur sur les jours ou un rendez-vous existe
 
-### 7. Synchronisation Supabase
+### 7. Synchronisation via API
 
-Le projet contient maintenant une integration Supabase pour :
+Le projet contient maintenant une integration avec une API REST interne (sous `/rdv/api/`) pour :
 
 - sauvegarder les rendez-vous en ligne
-- sauvegarder les photos dans un bucket de stockage
+- sauvegarder les photos via l'endpoint `/rdv/api/photos`
 - relire les rendez-vous depuis plusieurs appareils
-- migrer automatiquement les donnees locales si Supabase est vide
+- proteger l'API avec un header `X-Access-Code` (le code est demande a la connexion)
 
-Si Supabase n'est pas configure, le site repasse en mode local.
+Si l'API est injoignable, le site repasse automatiquement en mode local.
 
 ## Structure du projet
 
 ```text
 .
 ├── README.md
-├── SUPABASE_SETUP.md
 ├── app.html
 ├── index.html
 ├── login.html
 ├── rdv.html
-├── supabase-config.js
-├── supabase-setup.sql
+├── server/
 └── assets/
-    ├── leaflet/
-    └── supabase/
+    └── leaflet/
 ```
 
 ### Fichiers principaux
@@ -150,17 +142,8 @@ Si Supabase n'est pas configure, le site repasse en mode local.
 - `assets/leaflet/`
   copie locale de Leaflet pour eviter les erreurs de chargement externes
 
-- `assets/supabase/`
-  client Supabase embarque localement (le site est servi en statique, sans bundler)
-
-- `supabase-config.js`
-  fichier de configuration du projet Supabase
-
-- `supabase-setup.sql`
-  script SQL pour creer la table, le bucket et les policies
-
-- `SUPABASE_SETUP.md`
-  guide pas a pas pour brancher Supabase
+- `server/`
+  backend API REST servi sous `/rdv/api/` (auth par code, CRUD events, upload photos)
 
 ## Choix techniques
 
@@ -200,11 +183,11 @@ Ce choix permet d'avoir une vraie selection de point sans cle API Google Maps.
 
 ### Sauvegarde distante
 
-Le projet est prepare pour utiliser :
+Le projet utilise une API REST interne (sous `/rdv/api/`) :
 
-- [Supabase](https://supabase.com/docs/reference/javascript/initializing) pour la base et le stockage
-- [Supabase Storage](https://supabase.com/docs/guides/storage) pour les photos
-- des policies SQL de base pour un fonctionnement sans compte utilisateur
+- `GET /api/events`, `POST /api/events`, `PATCH /api/events/:id`, `DELETE /api/events/:id`
+- `POST /api/photos` (multipart `file`) renvoie une URL relative `/rdv/media/<uuid>.<ext>`
+- protection par header `X-Access-Code` (verifie via `POST /api/auth/check`)
 
 ## Donnees enregistrees
 
@@ -226,143 +209,41 @@ Chaque rendez-vous enregistre contient actuellement une structure proche de :
 }
 ```
 
-Quand Supabase est actif, ces donnees sont stockees dans la table `date_events`.
+Quand l'API est joignable, ces donnees sont stockees cote serveur (table `date_events`).
 
 ## Fonctionnement local
 
-Le projet ne demande pas de build ni d'installation npm. Le site est servi tel quel : `index.html`, `app.html`, `login.html`, `rdv.html`, `assets/`, `supabase-config.js` doivent rester pretes a l'emploi a la racine du repo.
+Pour ouvrir le projet en local :
 
-```bash
-# 1. Clone
-git clone https://github.com/srkpwjd9m7-svg/sarah-rendez-vous.git
-cd sarah-rendez-vous
+1. ouvrir `index.html`
+2. entrer le code d'acces
+3. acceder au site apres debloquage
+4. ajouter ou consulter les rendez-vous
 
-# 2. Dev local : ouvrir index.html directement,
-#    ou servir avec un mini serveur (recommande pour Supabase + fetch)
-python3 -m http.server 8000
-# -> http://localhost:8000
-```
+Le projet ne demande pas de build ni d'installation npm.
 
-Workflow type :
+## Mise en ligne
 
-```bash
-git checkout -b feat/ma-modif
-# ... edits ...
-git add . && git commit -m "feat: ..."
-git push origin feat/ma-modif         # ne deploie PAS
-```
+Le projet est publie sur GitHub Pages.
 
-## Mise en ligne (CI/CD)
+- depot GitHub :
+  [srkpwjd9m7-svg/sarah-rendez-vous](https://github.com/srkpwjd9m7-svg/sarah-rendez-vous)
 
-### Depot et URL prod
+- site en ligne :
+  [https://srkpwjd9m7-svg.github.io/sarah-rendez-vous/](https://srkpwjd9m7-svg.github.io/sarah-rendez-vous/)
 
-- depot GitHub : [srkpwjd9m7-svg/sarah-rendez-vous](https://github.com/srkpwjd9m7-svg/sarah-rendez-vous)
-- site en ligne : [https://lab.bourdat.fr/rdv/](https://lab.bourdat.fr/rdv/)
-- serveur : `atlas.bourdat.fr`, repertoire `/var/www/sarah-rdv/`, servi par Caddy
-- pas de build : les fichiers du repo sont servis tels quels
+## Backend API
 
-### Regle de branche
+L'API REST est servie sous `/rdv/api/` :
 
-Seule la branche `main` est deployee. Les autres branches peuvent etre pushees librement sur GitHub, rien ne bouge en prod tant qu'il n'y a pas de merge / push sur `main`.
+- `POST /api/auth/check` body `{code}` → 200 ou 401
+- `GET /api/events` → liste triee par date croissante
+- `POST /api/events`, `PATCH /api/events/:id`, `DELETE /api/events/:id`
+- `POST /api/photos` multipart `file` → `{url:"/rdv/media/<uuid>.<ext>"}`
+- `DELETE /api/photos/:filename`
+- header `X-Access-Code` requis sauf sur `/api/health` et `/api/auth/check`
 
-```bash
-git checkout main
-git merge feat/ma-modif
-git push origin main                  # -> webhook fire, site a jour en ~2-5 s
-                                      # + Telegram "Deployed ✅" + message du commit
-```
-
-### Triggers de deploiement
-
-Deux chemins convergent vers le meme script `/home/atlas/cron_notify.sh`, qui appelle `sarah-rdv-deploy.sh` :
-
-1. **Webhook GitHub** : a chaque push, GitHub appelle `https://lab.bourdat.fr/hooks/sarah-rdv` (signature HMAC SHA-256).
-   - `ref == refs/heads/main` : deploy immediat
-   - autre branche : ignore (HTTP 204), silencieux sur Telegram
-2. **Cron 5 min** : `*/5 * * * *` sur le serveur, poll `origin/main`. Filet de securite si le webhook tombe ou si GitHub a un incident.
-
-### Ce que fait le script de deploy (`sarah-rdv-deploy.sh`)
-
-```bash
-cd /var/www/sarah-rdv
-git fetch origin main
-# si HEAD == origin/main : no-op silencieux, exit 0
-# sinon :
-git reset --hard origin/main          # ecrase tout changement local serveur
-chown -R atlas:atlas .
-# notification Telegram "deployed" + message du dernier commit
-```
-
-La prod n'est jamais modifiee a la main : tout `git reset --hard origin/main` ecrase ce qui traine localement sur le serveur.
-
-### Notifications Telegram
-
-Bot `@Atlas69_bot`, chat `342255581`.
-
-| Cas | Telegram |
-| --- | --- |
-| Cron tick, pas de nouveau commit | silencieux (rien) |
-| Cron tick, nouveau commit deploye | `lab.bourdat.fr/rdv - Deployed ✅` + 🚀 `deployed` + message du commit |
-| Webhook GitHub push sur `main` | `lab.bourdat.fr/rdv (webhook) - Deployed ✅` + 🚀 `deployed` + message du commit |
-| Webhook push sur autre branche | silencieux (HTTP 204, ignore) |
-| Deploy echoue (n'importe quel trigger) | `… - Failed to deploy ❌` |
-
-### Verifier qu'un deploy est passe
-
-- Telegram (instantane)
-- `ssh root@atlas.bourdat.fr 'tail /var/log/sarah-rdv-deploy.log'`
-- `curl -sI https://lab.bourdat.fr/rdv/ | grep last-modified`
-- logs webhook : `ssh root@atlas.bourdat.fr 'journalctl -u sarah-rdv-webhook -n 30'`
-
-Delai prod apres `git push origin main` : ~2-5 s via webhook ; 5 min max si webhook KO (cron de secours).
-
-### Rollback manuel si un push casse la prod
-
-```bash
-ssh root@atlas.bourdat.fr
-cd /var/www/sarah-rdv
-git reset --hard HEAD~1   # ou un sha precis
-```
-
-Le serveur sera reecrase au prochain push sur `main`, donc penser a faire un revert cote GitHub aussi.
-
-## Activation de Supabase
-
-Pour activer la vraie sauvegarde en ligne :
-
-1. ouvrir [SUPABASE_SETUP.md](SUPABASE_SETUP.md)
-2. remplir [supabase-config.js](supabase-config.js)
-3. executer [supabase-setup.sql](supabase-setup.sql) dans Supabase
-4. pousser sur `main` (le deploy se declenche automatiquement, voir [Mise en ligne (CI/CD)](#mise-en-ligne-cicd))
-
-Etat actuel :
-
-- `Project URL` configure
-- cle publique Supabase configuree
-- script SQL execute dans Supabase
-- table `date_events` accessible
-- bucket `date-memories` accessible
-
-Si le site affiche encore un message d'erreur Supabase, ce ne sera normalement plus lie a l'absence de table ou de bucket, puisque ces elements repondent maintenant correctement.
-
-Une erreur deja rencontree pendant la migration etait :
-
-```json
-{
-  "code": "22P02",
-  "message": "invalid input syntax for type uuid: \"demo-1\""
-}
-```
-
-Cause :
-
-- une ancienne donnee locale de demonstration utilisait `demo-1` comme identifiant
-- Supabase attend un vrai UUID
-
-Correction appliquee :
-
-- les donnees locales sont maintenant normalisees automatiquement
-- tout identifiant non conforme est remplace par un vrai UUID avant synchronisation
+Le code d'acces est stocke cote navigateur dans `localStorage` (cle `nos-rendez-vous-access-code`) apres une connexion reussie.
 
 ## Limites actuelles
 
@@ -373,14 +254,14 @@ Correction appliquee :
 - le code d'acces est visible dans le code source
 - les donnees peuvent etre perdues si le stockage local du navigateur est vide
 
-Ces limites changent partiellement quand Supabase est configure :
+Ces limites changent partiellement quand l'API est joignable :
 
 - la synchro multi-appareils devient possible
 - les photos peuvent etre conservees en ligne
 
 Mais il reste une limite importante :
 
-- sans authentification utilisateur, la securite de la base reste basique
+- l'authentification est un simple code partage, la securite reste basique
 
 ## Pistes d'evolution
 
@@ -406,7 +287,7 @@ Historique Git :
 Les parties les plus importantes a surveiller sont :
 
 - la logique de stockage local
-- la logique de bascule local / Supabase
+- la logique de bascule local / API
 - la logique de verrouillage sur `index.html`
 - la logique de separation `a venir / termines`
 - la logique de carte et de reverse geocoding
@@ -417,4 +298,3 @@ Les parties les plus importantes a surveiller sont :
 Souhait utilisateur pour la suite :
 
 - pousser les modifications sur GitHub automatiquement apres les changements, sans redemander confirmation
-- tout push sur `main` declenche un deploy auto sur `lab.bourdat.fr/rdv` (voir [Mise en ligne (CI/CD)](#mise-en-ligne-cicd)) ; travailler sur des branches `feat/*` tant que la modif n'est pas validee pour la prod
