@@ -8,7 +8,10 @@
   'use strict';
 
   // ----- Config -----
-  const API_BASE = '/rdv/api';
+  // API_BASE is derived from the URL by the inline script in index.html
+  // (window.__rdvConfig) so that the same bundle serves both the production
+  // instance (/rdv/) and the public demo (/rdv-demo/).
+  const API_BASE = (window.__rdvConfig && window.__rdvConfig.apiBase) || '/rdv/api';
   const STORAGE_KEY = 'nos-rendez-vous-events';
   const ACCESS_CODE_KEY = 'nos-rendez-vous-access-code';
   const ACCESS_OK_KEY = 'nos-rendez-vous-access-ok';

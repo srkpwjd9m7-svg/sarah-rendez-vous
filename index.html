@@ -7,6 +7,29 @@
 <title>Nos Rendez-vous</title>
 <link rel="stylesheet" href="assets/leaflet/leaflet.css">
 <link rel="stylesheet" href="assets/app.css?v=1">
+<script>
+// Runtime config — derives basePath from URL so the same files serve both
+// the production instance (/rdv/) and the public demo (/rdv-demo/).
+(function(){
+  var seg = location.pathname.split('/').filter(Boolean)[0] || 'rdv';
+  var basePath = '/' + seg;
+  var isDemo = seg === 'rdv-demo';
+  // Demo access code is NOT secret — backend's ACCESS_CODE must match this.
+  var DEMO_CODE = 'demo-public';
+  window.__rdvConfig = {
+    basePath: basePath,
+    apiBase: basePath + '/api',
+    mediaBase: basePath + '/media',
+    isDemo: isDemo,
+  };
+  if (isDemo) {
+    try {
+      localStorage.setItem('nos-rendez-vous-access-code', DEMO_CODE);
+      sessionStorage.setItem('nos-rendez-vous-access-ok', 'ok');
+    } catch(e) {}
+  }
+})();
+</script>
 </head>
 <body>
 
@@ -37,7 +60,7 @@
 <script>
 // Lock screen flow
 (function(){
-  const API_BASE = '/rdv/api';
+  const API_BASE = (window.__rdvConfig && window.__rdvConfig.apiBase) || '/rdv/api';
   const CODE_KEY = 'nos-rendez-vous-access-code';
   const OK_KEY = 'nos-rendez-vous-access-ok';
   const lockScreen = document.getElementById('lock-screen');
