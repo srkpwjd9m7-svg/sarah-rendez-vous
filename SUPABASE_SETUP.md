@@ -30,6 +30,12 @@ Depuis le dashboard Supabase :
 
 Puis colle-les dans [supabase-config.js](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-config.js).
 
+Etat actuel du projet :
+
+- `Project URL` deja configure
+- cle publique deja configuree
+- il reste surtout a executer [supabase-setup.sql](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-setup.sql)
+
 ### 3. Creer la table et le bucket
 
 Ouvre le SQL Editor Supabase et execute le contenu de [supabase-setup.sql](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-setup.sql).

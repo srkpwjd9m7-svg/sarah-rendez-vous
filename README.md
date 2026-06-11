@@ -22,6 +22,8 @@ Les donnees sont enregistrees dans le navigateur avec `localStorage` et l'acces 
 
 Le projet est maintenant prepare pour une sauvegarde distante avec Supabase, mais cette partie n'est activee que si [supabase-config.js](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-config.js) contient de vrais identifiants.
 
+Les identifiants Supabase du projet sont maintenant renseignes dans la configuration locale du site. Il reste encore a executer le script SQL de preparation pour que la base et le stockage soient vraiment operationnels.
+
 Cela veut dire :
 
 - les rendez-vous sont conserves sur le navigateur utilise
@@ -238,6 +240,12 @@ Pour activer la vraie sauvegarde en ligne :
 2. remplir [supabase-config.js](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-config.js)
 3. executer [supabase-setup.sql](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/supabase-setup.sql) dans Supabase
 4. republier le site
+
+Etat actuel :
+
+- `Project URL` configure
+- cle publique Supabase configuree
+- script SQL encore a executer dans Supabase
 
 ## Limites actuelles
 
