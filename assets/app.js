@@ -420,6 +420,8 @@
     const toValidate = events.filter(e => e.status === 'toValidate');
     const doneCount = events.filter(e => e.status === 'done').length;
     const now = new Date();
+    const targetMonth = now.getMonth() + state.calOffset;
+    const calDate = new Date(now.getFullYear(), targetMonth, 1);
 
     let nextCard;
     if (next){
@@ -509,7 +511,7 @@
         ${validateSection}
 
         <div class="app-sec"><h3>Ce mois-ci</h3><a data-nav="cal">Calendrier</a></div>
-        ${miniCalHTML(now.getFullYear(), now.getMonth())}
+        ${miniCalHTML(calDate.getFullYear(), calDate.getMonth())}
       </div>`;
   }
 
@@ -752,8 +754,9 @@
     const i = initial || {};
     const opts = options || {};
     const isNew = !i.id;
-    const hideDateAtStart = isNew && !opts.forceDateStep;
     const isSchedulingMatch = !!opts.forceDateStep;
+    const showDateTimeField = !isNew || isSchedulingMatch;
+    const showSendMode = !isNew && !isSchedulingMatch;
     return `
       <div class="sheet-scrim" id="sheet-scrim">
         <div class="sheet">
@@ -767,7 +770,7 @@
             <label>Titre</label>
             <input type="text" id="f-title" placeholder="Ex : Dîner au bord de l'eau" value="${escapeHTML(i.title||'')}">
           </div>
-          <div class="field" id="date-time-field" style="display:${hideDateAtStart ? 'none' : 'flex'};gap:11px">
+          <div class="field" id="date-time-field" style="display:${showDateTimeField ? 'flex' : 'none'};gap:11px">
             <div style="flex:1.4"><label>Date</label><input type="date" id="f-date" value="${escapeHTML(i.date||iso(new Date(Date.now()+86400000*3)))}"></div>
             <div style="flex:1"><label>Heure</label><input type="time" id="f-time" value="${escapeHTML(i.time||'20:00')}"></div>
           </div>
@@ -781,7 +784,7 @@
             <label>Petit mot</label>
             <textarea id="f-note" placeholder="Un mot doux, une intention, une surprise…">${escapeHTML(i.note||'')}</textarea>
           </div>
-          <div class="field" style="display:${isSchedulingMatch ? 'none' : 'block'}">
+          <div class="field" style="display:${showSendMode ? 'block' : 'none'}">
             <label>Comment l'envoyer ?</label>
             <div class="seg" id="send-seg">
               <button type="button" class="${(i.status==='pending'||!i.id||i.status==='matched')?'on':''}" data-seg="invite">${ICON.gift} Invitation surprise</button>
@@ -791,7 +794,7 @@
 
           <div style="display:flex;gap:10px;margin-top:6px">
             <button class="btn btn-ghost" id="sheet-cancel" type="button">Annuler</button>
-            <button class="btn btn-primary btn-block" id="sheet-save" type="button">${ICON.heart} ${i.id?'Enregistrer':"Envoyer l'invitation"}</button>
+            <button class="btn btn-primary btn-block" id="sheet-save" type="button">${isSchedulingMatch ? ICON.check + ' Valider la date' : (i.id ? 'Enregistrer' : ICON.heart + " Envoyer l'invitation")}</button>
           </div>
         </div>
       </div>`;
@@ -930,7 +933,7 @@
     }
 
     // Segmented control
-    let sendMode = (options && options.forceDateStep) ? 'direct' : ((initial && initial.status === 'confirmed') ? 'direct' : 'invite');
+    let sendMode = isNewEvent(initial, options) ? 'invite' : ((options && options.forceDateStep) ? 'direct' : ((initial && initial.status === 'confirmed') ? 'direct' : 'invite'));
     const dateTimeField = scrim.querySelector('#date-time-field');
     scrim.querySelectorAll('#send-seg button').forEach(b => {
       b.addEventListener('click', () => {
@@ -979,6 +982,10 @@
       setTimeout(render, 220);
       setTimeout(() => toast((options && options.forceDateStep) ? 'Date fixée ❤' : (sendMode === 'invite' ? 'Invitation envoyée ❤' : 'Rendez-vous ajouté')), 260);
     });
+  }
+
+  function isNewEvent(initial, options){
+    return !(initial && initial.id) && !(options && options.forceDateStep);
   }
 
   // ============================================================
