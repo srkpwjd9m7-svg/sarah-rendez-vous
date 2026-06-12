@@ -13,6 +13,7 @@
   // instance (/rdv/) and the public demo (/rdv-demo/).
   const API_BASE = (window.__rdvConfig && window.__rdvConfig.apiBase) || '/rdv/api';
   const STORAGE_KEY = 'nos-rendez-vous-events';
+  const PENDING_ORDER_KEY = 'nos-rendez-vous-pending-order';
   const ACCESS_CODE_KEY = 'nos-rendez-vous-access-code';
   const DEFAULT_ACCESS_CODE = '01052021';
   const NOMINATIM = 'https://nominatim.openstreetmap.org';
@@ -165,7 +166,44 @@
     screen: 'dash',
     apiOnline: false,
     calOffset: 0, // month offset from current
+    pendingOrder: [],
   };
+
+  function loadPendingOrder(){
+    try {
+      const raw = JSON.parse(localStorage.getItem(PENDING_ORDER_KEY) || '[]');
+      return Array.isArray(raw) ? raw.filter(id => typeof id === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function savePendingOrder(order){
+    state.pendingOrder = Array.isArray(order) ? order.slice() : [];
+    try { localStorage.setItem(PENDING_ORDER_KEY, JSON.stringify(state.pendingOrder)); } catch {}
+  }
+
+  function getPendingEvents(){
+    return state.events
+      .filter(e => e.status === 'pending')
+      .sort((a,b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
+  }
+
+  function syncPendingOrder(){
+    const ids = new Set(getPendingEvents().map(e => e.id));
+    const kept = state.pendingOrder.filter(id => ids.has(id));
+    const missing = Array.from(ids).filter(id => !kept.includes(id));
+    savePendingOrder([...kept, ...missing]);
+  }
+
+  function pendingQueue(preferredId){
+    syncPendingOrder();
+    const queue = state.pendingOrder.slice();
+    if (preferredId && queue.includes(preferredId)) {
+      while (queue[0] !== preferredId) queue.push(queue.shift());
+    }
+    return queue;
+  }
 
   // ============================================================
   // DATA OPS
@@ -176,13 +214,18 @@
         const list = await api('/events');
         const mapped = list.map(apiToState);
         lsSave(mapped); // mirror to local for offline
+        state.events = mapped;
+        syncPendingOrder();
         return mapped;
       } catch (e) {
         state.apiOnline = false;
         showOffline(true);
       }
     }
-    return lsLoad();
+    const local = lsLoad();
+    state.events = local;
+    syncPendingOrder();
+    return local;
   }
 
   async function createEvent(data){
@@ -393,6 +436,7 @@
     const invSection = pendings.length ? `
       <div class="app-sec">
         <h3>Invitations en attente</h3>
+        <button class="btn btn-soft btn-sm" type="button" data-open-pending-deck>Tout afficher</button>
       </div>
       <div class="inv-strip">
         ${pendings.map(e => `
@@ -1020,6 +1064,166 @@
   }
 
   // ============================================================
+  // INVITATIONS EN PILE
+  // ============================================================
+  function pendingDeckHTML(ev, count, hasNext){
+    return `
+      <div class="pending-deck-screen">
+        <div class="pending-deck-top">
+          <button class="inv-back" type="button" data-pending-close>${ICON.back}</button>
+          <div class="pending-deck-copy">
+            <div class="eyebrow">Toutes les invitations</div>
+            <h2>${count} en attente</h2>
+            <p>Swipe à droite pour activer. Swipe à gauche pour passer sans supprimer.</p>
+          </div>
+        </div>
+
+        <div class="swipe-deck-wrap">
+          ${hasNext ? '<div class="swipe-deck-shadow"></div>' : ''}
+          <article class="swipe-deck-card" data-swipe-card data-event-id="${escapeHTML(ev.id)}">
+            <div class="swipe-stamp">En attente</div>
+            <div class="swipe-card-head">
+              <div class="swipe-heart">${ICON.heart}</div>
+              <div>
+                <div class="swipe-kicker">Invitation surprise</div>
+                <h1>${escapeHTML(ev.title)}</h1>
+              </div>
+            </div>
+            <div class="swipe-detail-list">
+              <div class="row">${ICON.cal} ${fmtLong(ev.date)}</div>
+              <div class="row">${ICON.clock} ${escapeHTML(ev.time || '20:00')}</div>
+              <div class="row">${ICON.pin} ${escapeHTML(ev.location)}</div>
+            </div>
+            ${ev.note ? `<p class="swipe-note">« ${escapeHTML(ev.note)} »</p>` : ''}
+            ${photoTilesHTML(ev.intentPhotos)}
+            <div class="swipe-hints">
+              <span>← Passer</span>
+              <span>Accepter →</span>
+            </div>
+          </article>
+        </div>
+
+        <div class="swipe-actions-bar">
+          <button class="btn btn-ghost" type="button" data-pending-skip>Passer pour l'instant</button>
+          <button class="btn btn-primary" type="button" data-pending-accept>Activer l'invitation</button>
+        </div>
+      </div>`;
+  }
+
+  function movePendingToEnd(id){
+    const queue = pendingQueue();
+    const filtered = queue.filter(x => x !== id);
+    filtered.push(id);
+    savePendingOrder(filtered);
+  }
+
+  async function acceptPendingInvitation(id){
+    try {
+      await updateEvent(id, { status: 'confirmed' });
+    } catch {}
+    state.events = await loadEvents();
+    savePendingOrder(state.pendingOrder.filter(x => x !== id));
+  }
+
+  function closePendingDeck(){
+    const overlay = shellInner.querySelector('.pending-deck-overlay');
+    if (overlay) overlay.remove();
+    render();
+  }
+
+  function mountPendingDeck(host, preferredId){
+    const queue = pendingQueue(preferredId);
+    const currentId = queue[0];
+    const ev = state.events.find(item => item.id === currentId && item.status === 'pending');
+
+    if (!ev){
+      host.innerHTML = `
+        <div class="pending-deck-screen pending-empty">
+          <div class="big-heart">❤</div>
+          <h2>Plus aucune invitation en attente</h2>
+          <p>Tout est déjà trié pour le moment.</p>
+          <button class="btn btn-primary" type="button" data-pending-close>Revenir à l'accueil</button>
+        </div>`;
+      const closeBtn = host.querySelector('[data-pending-close]');
+      if (closeBtn) closeBtn.addEventListener('click', closePendingDeck);
+      return;
+    }
+
+    host.innerHTML = pendingDeckHTML(ev, queue.length, queue.length > 1);
+
+    const card = host.querySelector('[data-swipe-card]');
+    const closeBtn = host.querySelector('[data-pending-close]');
+    const skipBtn = host.querySelector('[data-pending-skip]');
+    const acceptBtn = host.querySelector('[data-pending-accept]');
+
+    const finishSwipe = async (direction) => {
+      if (!card || card.dataset.busy === '1') return;
+      card.dataset.busy = '1';
+      card.classList.remove('dragging');
+      card.style.transform = '';
+      card.classList.add(direction === 'right' ? 'leave-right' : 'leave-left');
+      await new Promise(resolve => setTimeout(resolve, 220));
+      if (direction === 'right') {
+        await acceptPendingInvitation(ev.id);
+        toast('Invitation activée ❤');
+      } else {
+        movePendingToEnd(ev.id);
+      }
+      mountPendingDeck(host);
+    };
+
+    let startX = 0;
+    let dx = 0;
+    let pointerId = null;
+
+    const resetCard = () => {
+      dx = 0;
+      card.classList.remove('dragging');
+      card.style.transform = '';
+    };
+
+    const release = async () => {
+      if (!card.classList.contains('dragging')) return;
+      card.classList.remove('dragging');
+      if (pointerId !== null && card.hasPointerCapture(pointerId)) card.releasePointerCapture(pointerId);
+      if (dx > 120) return finishSwipe('right');
+      if (dx < -120) return finishSwipe('left');
+      resetCard();
+    };
+
+    card.addEventListener('pointerdown', (event) => {
+      if (card.dataset.busy === '1') return;
+      pointerId = event.pointerId;
+      startX = event.clientX;
+      dx = 0;
+      card.classList.add('dragging');
+      card.setPointerCapture(pointerId);
+    });
+
+    card.addEventListener('pointermove', (event) => {
+      if (!card.classList.contains('dragging')) return;
+      dx = event.clientX - startX;
+      const rotate = dx / 18;
+      card.style.transform = `translateX(${dx}px) rotate(${rotate}deg)`;
+    });
+
+    card.addEventListener('pointerup', release);
+    card.addEventListener('pointercancel', release);
+
+    if (closeBtn) closeBtn.addEventListener('click', closePendingDeck);
+    if (skipBtn) skipBtn.addEventListener('click', () => finishSwipe('left'));
+    if (acceptBtn) acceptBtn.addEventListener('click', () => finishSwipe('right'));
+  }
+
+  function openPendingDeck(preferredId){
+    const overlay = document.createElement('div');
+    overlay.className = 'pending-deck-overlay';
+    overlay.style.cssText = 'position:absolute;inset:0;z-index:76;background:var(--bg)';
+    shellInner.appendChild(overlay);
+    mountPendingDeck(overlay, preferredId);
+  }
+
+  // ============================================================
   // INVITATION JOUEUSE
   // ============================================================
   const NO_MORPH = ['Non','Tu es sûr·e ?','Vraiment ?','Réfléchis bien…',"Allez, dis oui",'Dernière chance','Non ? 🥺','…s\'il te plaît ?'];
@@ -1337,11 +1541,12 @@
     if (nav){
       const t = nav.dataset.nav;
       if (t === 'new') return openSheet(null);
-      if (t === 'inv') return openInvitationOverlay(null);
+      if (t === 'inv') return openPendingDeck(null);
       state.screen = t; render(); return;
     }
+    if (e.target.closest('[data-open-pending-deck]')) return openPendingDeck(null);
     const inv = e.target.closest('[data-open-inv]');
-    if (inv) return openInvitationOverlay(inv.dataset.openInv);
+    if (inv) return openPendingDeck(inv.dataset.openInv);
 
     const share = e.target.closest('[data-share-inv]');
     if (share) return shareInvitation(share.dataset.shareInv);
@@ -1396,6 +1601,7 @@
     try { await api('/health'); state.apiOnline = true; showOffline(false); }
     catch { state.apiOnline = false; showOffline(true); }
 
+    state.pendingOrder = loadPendingOrder();
     state.events = await loadEvents();
     render();
 
@@ -1405,7 +1611,7 @@
       const params = new URLSearchParams(location.search);
       const invId = params.get('inv');
       if (invId && state.events.some(e => e.id === invId)) {
-        openInvitationOverlay(invId);
+        openPendingDeck(invId);
         // Strip the query so a refresh doesn't re-open the modal.
         params.delete('inv');
         const qs = params.toString();
