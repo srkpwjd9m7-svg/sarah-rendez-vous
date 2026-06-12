@@ -71,7 +71,9 @@
     return `${y}-${m}-${day}`;
   }
   function parseISO(s){ return new Date(s + 'T12:00:00'); }
+  function hasPlannedDate(value){ return !!(value && /^\d{4}-\d{2}-\d{2}$/.test(value)); }
   function fmtLong(s){
+    if (!hasPlannedDate(s)) return 'Date à choisir ensemble';
     return parseISO(s).toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' });
   }
   function fmtDay(s){ return String(parseISO(s).getDate()); }
@@ -116,16 +118,19 @@
   }
 
   // ----- API → state model -----
-  // status: 'pending' (invitation pas acceptée) | 'confirmed' | 'toValidate' (passé, pas validé) | 'done'
+  // status: 'pending' | 'matched' | 'confirmed' | 'toValidate' | 'done'
   function apiToState(e){
     const d = e.event_date;
     const t = e.event_time || '20:00';
-    const eventDate = new Date(d + 'T' + t + ':00');
-    const isFuture = eventDate >= new Date(Date.now() - 3*3600*1000); // tolerance 3h
+    const hasDate = hasPlannedDate(d);
+    const eventDate = hasDate ? new Date(d + 'T' + t + ':00') : null;
+    const isFuture = hasDate ? eventDate >= new Date(Date.now() - 3*3600*1000) : false; // tolerance 3h
     let status;
     if (e.completed) status = 'done';
-    else if (!isFuture) status = 'toValidate';
+    else if (e.accepted === false && (e.approval_count || 0) >= 2) status = 'matched';
     else if (e.accepted === false) status = 'pending';
+    else if (!hasDate) status = 'matched';
+    else if (!isFuture) status = 'toValidate';
     else status = 'confirmed';
     return {
       id: e.id,
@@ -137,6 +142,7 @@
       mapLink: e.map_link || '',
       note: e.note || '',
       status,
+      approvalCount: Math.max(0, Math.min(2, e.approval_count || 0)),
       rating: e.rating || 0,
       memory: e.completion_note || '',
       photos: Array.isArray(e.completion_photos) ? e.completion_photos : [],
@@ -154,7 +160,8 @@
       map_link: s.mapLink || '',
       note: s.note || '',
       photos: s.intentPhotos || [],
-      accepted: s.status === 'pending' ? 0 : 1,
+      accepted: (s.status === 'pending' || s.status === 'matched') ? 0 : 1,
+      approval_count: s.status === 'matched' ? 2 : Math.max(0, Math.min(2, s.approvalCount || 0)),
     };
   }
 
@@ -185,8 +192,12 @@
 
   function getPendingEvents(){
     return state.events
-      .filter(e => e.status === 'pending')
-      .sort((a,b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
+      .filter(e => e.status === 'pending' || e.status === 'matched')
+      .sort((a,b) => {
+        const left = (a.date || '9999-99-99') + (a.time || '');
+        const right = (b.date || '9999-99-99') + (b.time || '');
+        return left.localeCompare(right);
+      });
   }
 
   function syncPendingOrder(){
@@ -254,12 +265,14 @@
         if ('mapLink' in patch) body.map_link = patch.mapLink;
         if ('note' in patch) body.note = patch.note;
         if ('memory' in patch) body.completion_note = patch.memory;
+        if ('approvalCount' in patch) body.approval_count = patch.approvalCount;
         if ('rating' in patch) body.rating = patch.rating;
         if ('photos' in patch) body.completion_photos = patch.photos;
         if ('intentPhotos' in patch) body.photos = patch.intentPhotos;
         if ('status' in patch){
           if (patch.status === 'done'){ body.completed = true; }
           else if (patch.status === 'confirmed'){ body.completed = false; body.accepted = true; }
+          else if (patch.status === 'matched'){ body.completed = false; body.accepted = false; }
           else if (patch.status === 'pending'){ body.completed = false; body.accepted = false; }
         }
         const updated = await api('/events/' + encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) });
@@ -387,6 +400,7 @@
   }
 
   function countdownParts(dateStr, time){
+    if (!hasPlannedDate(dateStr)) return { d: 0, h: 0, m: 0 };
     const target = new Date(dateStr + 'T' + (time || '12:00') + ':00');
     let diff = Math.max(0, target - new Date());
     const d = Math.floor(diff/86400000); diff -= d*86400000;
@@ -399,9 +413,10 @@
   function renderDashboard(){
     const events = state.events;
     const next = events
-      .filter(e => e.status === 'confirmed')
+      .filter(e => e.status === 'confirmed' && hasPlannedDate(e.date))
       .sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time))[0];
     const pendings = events.filter(e => e.status === 'pending');
+    const matched = events.filter(e => e.status === 'matched');
     const toValidate = events.filter(e => e.status === 'toValidate');
     const doneCount = events.filter(e => e.status === 'done').length;
     const now = new Date();
@@ -433,20 +448,20 @@
         </div>`;
     }
 
-    const invSection = pendings.length ? `
+    const invSection = (pendings.length || matched.length) ? `
       <div class="app-sec">
         <h3>Invitations en attente</h3>
         <button class="btn btn-soft btn-sm" type="button" data-open-pending-deck>Tout afficher</button>
       </div>
       <div class="inv-strip">
-        ${pendings.map(e => `
+        ${[...matched, ...pendings].map(e => `
           <div class="inv-pill" data-open-inv="${e.id}">
             <div class="inv-seal">${ICON.heart}</div>
             <div class="ip-body">
               <div class="ip-t">${escapeHTML(e.title)}</div>
-              <div class="ip-s">${fmtLong(e.date)} · à confirmer</div>
+              <div class="ip-s">${e.status === 'matched' ? '2/2 oui · date à choisir' : `${Math.max(0, Math.min(2, e.approvalCount || 0))}/2 oui · en attente`}</div>
             </div>
-            <div class="ip-go">Ouvrir →</div>
+            <div class="ip-go">${e.status === 'matched' ? 'Choisir →' : 'Ouvrir →'}</div>
           </div>`).join('')}
       </div>` : '';
 
@@ -502,7 +517,7 @@
   function renderCalendar(){
     const events = state.events;
     const upcoming = events
-      .filter(e => ['confirmed','pending','toValidate'].includes(e.status))
+      .filter(e => ['confirmed','toValidate'].includes(e.status) && hasPlannedDate(e.date))
       .sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
 
     const now = new Date();
@@ -512,6 +527,7 @@
     const tag = (st) => {
       if (st === 'confirmed') return '<span class="ev-tag confirmed">Confirmé</span>';
       if (st === 'pending') return '<span class="ev-tag pending">En attente</span>';
+      if (st === 'matched') return '<span class="ev-tag pending">2/2 oui</span>';
       if (st === 'toValidate') return '<span class="ev-tag validate">À valider</span>';
       return '';
     };
@@ -732,23 +748,26 @@
   // ============================================================
   // SHEET — Nouveau / Modifier RDV
   // ============================================================
-  function formSheetHTML(initial){
+  function formSheetHTML(initial, options){
     const i = initial || {};
+    const opts = options || {};
     const isNew = !i.id;
+    const hideDateAtStart = isNew && !opts.forceDateStep;
+    const isSchedulingMatch = !!opts.forceDateStep;
     return `
       <div class="sheet-scrim" id="sheet-scrim">
         <div class="sheet">
           <div class="sheet-grip"></div>
-          <h2>${isNew ? 'Nouveau' : 'Modifier'} rendez-vous</h2>
-          <p class="sub">${isNew ? 'Propose une date à ton amour — pioche une idée ou laisse-toi guider par le lieu.' : 'Ajuste comme tu veux.'}</p>
+          <h2>${isSchedulingMatch ? 'Choisir la date' : (isNew ? 'Nouveau' : 'Modifier') + ' rendez-vous'}</h2>
+          <p class="sub">${isSchedulingMatch ? 'Vous avez tous les deux dit oui. Il ne reste plus qu’à fixer la date.' : (isNew ? "Crée d'abord l'invitation, la date pourra venir après." : 'Ajuste comme tu veux.')}</p>
 
-          ${isNew ? composerHTML() : ''}
+          ${(isNew && !isSchedulingMatch) ? composerHTML() : ''}
 
           <div class="field">
             <label>Titre</label>
             <input type="text" id="f-title" placeholder="Ex : Dîner au bord de l'eau" value="${escapeHTML(i.title||'')}">
           </div>
-          <div class="field" style="display:flex;gap:11px">
+          <div class="field" id="date-time-field" style="display:${hideDateAtStart ? 'none' : 'flex'};gap:11px">
             <div style="flex:1.4"><label>Date</label><input type="date" id="f-date" value="${escapeHTML(i.date||iso(new Date(Date.now()+86400000*3)))}"></div>
             <div style="flex:1"><label>Heure</label><input type="time" id="f-time" value="${escapeHTML(i.time||'20:00')}"></div>
           </div>
@@ -762,10 +781,10 @@
             <label>Petit mot</label>
             <textarea id="f-note" placeholder="Un mot doux, une intention, une surprise…">${escapeHTML(i.note||'')}</textarea>
           </div>
-          <div class="field">
+          <div class="field" style="display:${isSchedulingMatch ? 'none' : 'block'}">
             <label>Comment l'envoyer ?</label>
             <div class="seg" id="send-seg">
-              <button type="button" class="${(i.status==='pending'||!i.id)?'on':''}" data-seg="invite">${ICON.gift} Invitation surprise</button>
+              <button type="button" class="${(i.status==='pending'||!i.id||i.status==='matched')?'on':''}" data-seg="invite">${ICON.gift} Invitation surprise</button>
               <button type="button" class="${i.status==='confirmed'?'on':''}" data-seg="direct">Ajouter direct</button>
             </div>
           </div>
@@ -778,9 +797,9 @@
       </div>`;
   }
 
-  function openSheet(initial){
+  function openSheet(initial, options){
     const wrap = document.createElement('div');
-    wrap.innerHTML = formSheetHTML(initial);
+    wrap.innerHTML = formSheetHTML(initial, options);
     const scrim = wrap.firstElementChild;
     shellInner.appendChild(scrim);
     requestAnimationFrame(() => scrim.classList.add('open'));
@@ -911,12 +930,14 @@
     }
 
     // Segmented control
-    let sendMode = (initial && initial.status === 'confirmed') ? 'direct' : 'invite';
+    let sendMode = (options && options.forceDateStep) ? 'direct' : ((initial && initial.status === 'confirmed') ? 'direct' : 'invite');
+    const dateTimeField = scrim.querySelector('#date-time-field');
     scrim.querySelectorAll('#send-seg button').forEach(b => {
       b.addEventListener('click', () => {
         scrim.querySelectorAll('#send-seg button').forEach(x => x.classList.remove('on'));
         b.classList.add('on');
         sendMode = b.dataset.seg;
+        if (dateTimeField) dateTimeField.style.display = sendMode === 'invite' ? 'none' : 'flex';
         scrim.querySelector('#sheet-save').innerHTML =
           sendMode === 'invite' ? ICON.heart + " Envoyer l'invitation" : ICON.check + ' Ajouter au calendrier';
       });
@@ -929,14 +950,19 @@
     scrim.querySelector('#sheet-save').addEventListener('click', async () => {
       const data = {
         title: scrim.querySelector('#f-title').value.trim() || 'Surprise',
-        date: scrim.querySelector('#f-date').value,
-        time: scrim.querySelector('#f-time').value || '20:00',
+        date: sendMode === 'invite' ? '' : scrim.querySelector('#f-date').value,
+        time: sendMode === 'invite' ? '' : (scrim.querySelector('#f-time').value || '20:00'),
         location: scrim.querySelector('#f-location').value.trim() || 'À définir',
         note: scrim.querySelector('#f-note').value.trim(),
         coordinates: coords,
         mapLink: mapLink,
         status: sendMode === 'invite' ? 'pending' : 'confirmed',
+        approvalCount: (options && options.forceDateStep) ? 2 : (sendMode === 'invite' ? 0 : 2),
       };
+      if (sendMode !== 'invite' && !data.date) {
+        toast('Choisis une date pour finaliser');
+        return;
+      }
       try {
         if (initial && initial.id){
           await updateEvent(initial.id, data);
@@ -951,7 +977,7 @@
       if (sendMode === 'invite') state.screen = 'dash';
       else state.screen = 'cal';
       setTimeout(render, 220);
-      setTimeout(() => toast(sendMode === 'invite' ? 'Invitation envoyée ❤' : 'Rendez-vous ajouté'), 260);
+      setTimeout(() => toast((options && options.forceDateStep) ? 'Date fixée ❤' : (sendMode === 'invite' ? 'Invitation envoyée ❤' : 'Rendez-vous ajouté')), 260);
     });
   }
 
@@ -1090,8 +1116,8 @@
               </div>
             </div>
             <div class="swipe-detail-list">
-              <div class="row">${ICON.cal} ${fmtLong(ev.date)}</div>
-              <div class="row">${ICON.clock} ${escapeHTML(ev.time || '20:00')}</div>
+              <div class="row">${ICON.cal} ${ev.status === 'matched' ? 'Vous avez matché, il reste à fixer la date' : `${Math.max(0, Math.min(2, ev.approvalCount || 0))}/2 oui pour le moment`}</div>
+              ${hasPlannedDate(ev.date) ? `<div class="row">${ICON.clock} ${escapeHTML(ev.time || '20:00')}</div>` : ''}
               <div class="row">${ICON.pin} ${escapeHTML(ev.location)}</div>
             </div>
             ${ev.note ? `<p class="swipe-note">« ${escapeHTML(ev.note)} »</p>` : ''}
@@ -1105,7 +1131,7 @@
 
         <div class="swipe-actions-bar">
           <button class="btn btn-ghost" type="button" data-pending-skip>Passer pour l'instant</button>
-          <button class="btn btn-primary" type="button" data-pending-accept>Activer l'invitation</button>
+          <button class="btn btn-primary" type="button" data-pending-accept>${ev.status === 'matched' ? 'Choisir la date' : 'Dire oui'}</button>
         </div>
       </div>`;
   }
@@ -1118,11 +1144,39 @@
   }
 
   async function acceptPendingInvitation(id){
+    const current = state.events.find(event => event.id === id);
+    if (!current) return { matched: false };
+    const nextApprovalCount = Math.max(0, Math.min(2, (current.approvalCount || 0) + 1));
     try {
-      await updateEvent(id, { status: 'confirmed' });
+      await updateEvent(id, {
+        status: nextApprovalCount >= 2 ? 'matched' : 'pending',
+        approvalCount: nextApprovalCount,
+      });
     } catch {}
     state.events = await loadEvents();
-    savePendingOrder(state.pendingOrder.filter(x => x !== id));
+    if (nextApprovalCount >= 2) {
+      savePendingOrder(state.pendingOrder);
+      return { matched: true };
+    }
+    movePendingToEnd(id);
+    return { matched: false };
+  }
+
+  function openMatchedScheduling(ev){
+    closePendingDeck();
+    toast('Activite matchee, proposez une date ❤');
+    openSheet({
+      id: ev.id,
+      title: ev.title,
+      date: ev.date,
+      time: ev.time,
+      location: ev.location,
+      coordinates: ev.coordinates,
+      mapLink: ev.mapLink,
+      note: ev.note,
+      status: 'matched',
+      approvalCount: 2,
+    }, { forceDateStep: true });
   }
 
   function closePendingDeck(){
@@ -1137,15 +1191,8 @@
     const ev = state.events.find(item => item.id === currentId && item.status === 'pending');
 
     if (!ev){
-      host.innerHTML = `
-        <div class="pending-deck-screen pending-empty">
-          <div class="big-heart">❤</div>
-          <h2>Plus aucune invitation en attente</h2>
-          <p>Tout est déjà trié pour le moment.</p>
-          <button class="btn btn-primary" type="button" data-pending-close>Revenir à l'accueil</button>
-        </div>`;
-      const closeBtn = host.querySelector('[data-pending-close]');
-      if (closeBtn) closeBtn.addEventListener('click', closePendingDeck);
+      toast('Vous avez deja fait votre choix sur les activites proposees');
+      closePendingDeck();
       return;
     }
 
@@ -1164,8 +1211,20 @@
       card.classList.add(direction === 'right' ? 'leave-right' : 'leave-left');
       await new Promise(resolve => setTimeout(resolve, 220));
       if (direction === 'right') {
-        await acceptPendingInvitation(ev.id);
-        toast('Invitation activée ❤');
+        if (ev.status === 'matched') {
+          openMatchedScheduling(ev);
+          return;
+        }
+        const result = await acceptPendingInvitation(ev.id);
+        if (result.matched) {
+          const updated = state.events.find(item => item.id === ev.id);
+          if (updated) {
+            toast('Vous avez tous les deux dit oui ❤');
+            openMatchedScheduling(updated);
+            return;
+          }
+        }
+        toast('Premier oui enregistré ❤');
       } else {
         movePendingToEnd(ev.id);
       }
@@ -1345,7 +1404,13 @@
     async function triggerYes(){
       confettiBurst(layer);
       setTimeout(() => success.classList.add('show'), 260);
-      try { await updateEvent(ev.id, { status: 'confirmed' }); } catch {}
+      const nextApprovalCount = Math.max(0, Math.min(2, (ev.approvalCount || 0) + 1));
+      try {
+        await updateEvent(ev.id, {
+          status: nextApprovalCount >= 2 ? 'matched' : 'pending',
+          approvalCount: nextApprovalCount,
+        });
+      } catch {}
       state.events = await loadEvents();
     }
 

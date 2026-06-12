@@ -67,6 +67,7 @@ function addColumnIfMissing(sql) {
 addColumnIfMissing("ALTER TABLE date_events ADD COLUMN event_time TEXT DEFAULT ''");
 addColumnIfMissing("ALTER TABLE date_events ADD COLUMN rating INTEGER NOT NULL DEFAULT 0");
 addColumnIfMissing("ALTER TABLE date_events ADD COLUMN accepted INTEGER NOT NULL DEFAULT 1");
+addColumnIfMissing("ALTER TABLE date_events ADD COLUMN approval_count INTEGER NOT NULL DEFAULT 0");
 
 // ---------- Helpers ----------
 const ACCESS_CODE_BUF = Buffer.from(ACCESS_CODE, 'utf8');
@@ -104,6 +105,7 @@ function rowToEvent(row) {
     photos: parseJSON(row.photos, []),
     completed: !!row.completed,
     accepted: row.accepted == null ? true : !!row.accepted,
+    approval_count: row.approval_count ?? 0,
     rating: row.rating ?? 0,
     completion_note: row.completion_note ?? '',
     completion_photos: parseJSON(row.completion_photos, []),
@@ -115,7 +117,7 @@ function rowToEvent(row) {
 // Champs autorisés pour create/patch
 const WRITABLE_FIELDS = [
   'title', 'event_date', 'event_time', 'location', 'coordinates', 'map_link',
-  'note', 'photos', 'completed', 'accepted', 'rating',
+  'note', 'photos', 'completed', 'accepted', 'approval_count', 'rating',
   'completion_note', 'completion_photos',
 ];
 
@@ -129,6 +131,7 @@ function normalizeForDb(field, value) {
     return typeof value === 'string' ? value : JSON.stringify(value);
   }
   if (field === 'completed' || field === 'accepted') return value ? 1 : 0;
+  if (field === 'approval_count') return Math.max(0, Math.min(2, parseInt(value, 10) || 0));
   if (field === 'rating') return Math.max(0, Math.min(5, parseInt(value, 10) || 0));
   return value;
 }
@@ -182,8 +185,12 @@ app.get('/api/events', (_req, res) => {
 app.post('/api/events', (req, res, next) => {
   try {
     const body = req.body || {};
-    if (!body.title || !body.event_date || !body.location) {
-      return res.status(400).json({ error: 'missing_required_fields', fields: ['title', 'event_date', 'location'] });
+    const needsPlannedDate = body.accepted !== false;
+    if (!body.title || !body.location || (needsPlannedDate && !body.event_date)) {
+      return res.status(400).json({
+        error: 'missing_required_fields',
+        fields: needsPlannedDate ? ['title', 'event_date', 'location'] : ['title', 'location']
+      });
     }
     const id = body.id || crypto.randomUUID();
 
