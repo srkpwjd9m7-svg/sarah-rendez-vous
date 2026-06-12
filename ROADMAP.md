@@ -1,13 +1,14 @@
 # Roadmap
 
-## Etat actuel (2026-06-11)
+## Etat actuel (2026-06-12)
 
-- Front statique HTML/JS servi sur `https://lab.bourdat.fr/rdv/`
+- Front statique HTML/JS servi sur `https://lab.bourdat.fr/rdv/` + demo publique sur `https://atlas.bourdat.fr/rdv-demo/`
 - Backend Node + Express + SQLite (better-sqlite3) sur le serveur, exposé via Caddy sous `/rdv/api/*`
 - Upload photos vers `/var/www/sarah-rdv/data/photos/`, servies sous `/rdv/media/*`
 - Auth : code secret unique cote serveur, transmis par le front en header `X-Access-Code`
 - Auto-deploy : push sur `main` -> webhook GitHub -> `git reset --hard` cote serveur (+ filet cron 5 min)
 - Notif Telegram a chaque deploy reussi/echec
+- Flux d'invitations a deux temps (`pending` -> `matched` -> `confirmed`) avec deck swipe et `approval_count` 0..2
 
 ## Direction produit
 
@@ -50,3 +51,4 @@ Le projet vise a devenir une app mobile (iOS + Android) en **React Native** plus
 | 2026-06-11 | Node + Express + better-sqlite3 | Plus simple a porter ; pas d'ORM ; meme runtime que le futur RN partiellement |
 | 2026-06-11 | Photos sur disque local + Caddy | Pas de S3 inutile a cette echelle ; backup classique |
 | 2026-06-11 | Code secret en header | Etape transition ; on remplacera par auth user des qu'on ajoute >1 personne |
+| 2026-06-12 | Invitations a deux temps (`approval_count` 0..2 + statut `matched`) | Permet de creer une invitation sans date et de la valider a deux avant de fixer le RDV. Etape vers le futur mode multi-utilisateurs. Piege a retenir : la file d'invitations (`pendingQueue`) contient `pending` ET `matched` — tout filtre cote front doit inclure les deux statuts. |

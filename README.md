@@ -79,6 +79,20 @@ Le site separe les activites en deux groupes :
 
 Un rendez-vous cree arrive d'abord dans la liste des rendez-vous a venir.
 
+### 4 bis. Invitations a deux temps (matching)
+
+Une invitation peut aussi etre creee **sans date** : elle reste a l'etat `pending` tant que les deux personnes ne l'ont pas validee.
+
+- chaque "oui" incremente `approval_count` (0 -> 1 -> 2, clampé cote serveur)
+- a 2/2 oui, l'invitation passe en statut `matched` et le couple est invite a fixer la date
+- le pile de cartes "Invitations en attente" (deck swipe) accepte les deux types : `pending` et `matched`
+  - swipe droite sur un `pending` = "Dire oui"
+  - swipe droite sur un `matched` = ouvre la feuille de planification (titre/lieu deja remplis, on choisit juste la date)
+  - swipe gauche = "Passer pour l'instant" (l'invitation reste en file, repoussee a la fin)
+- l'ordre de la pile est memorise dans `localStorage` sous `nos-rendez-vous-pending-order`
+
+Schema des statuts cote front : `pending` | `matched` | `confirmed` | `toValidate` | `done`.
+
 ### 5. Validation de fin de rendez-vous
 
 A la fin d'un rendez-vous, il est possible de :
@@ -197,17 +211,23 @@ Chaque rendez-vous enregistre contient actuellement une structure proche de :
 {
   id,
   title,
-  date,
+  date,           // optionnelle si statut=pending (l'invitation peut etre creee sans date)
+  time,
   location,
   coordinates,
   mapLink,
   note,
   photos,
+  status,         // 'pending' | 'matched' | 'confirmed' | 'toValidate' | 'done'
+  approvalCount,  // 0..2 (nombre de "oui" sur une invitation)
+  rating,
   completed,
   completionNote,
   completionPhotos
 }
 ```
+
+Cote backend, le champ correspond a la colonne `approval_count` de la table `date_events` (`INTEGER NOT NULL DEFAULT 0`, clampe 0..2 a l'ecriture). Le serveur autorise un `POST /api/events` sans `event_date` uniquement si `accepted=false` (invitation `pending`).
 
 Quand l'API est joignable, ces donnees sont stockees cote serveur (table `date_events`).
 
@@ -292,6 +312,7 @@ Les parties les plus importantes a surveiller sont :
 - la logique de separation `a venir / termines`
 - la logique de carte et de reverse geocoding
 - la protection par code
+- la pile d'invitations (`pendingQueue` / `mountPendingDeck` dans `assets/app.js`) : la file contient les statuts `pending` ET `matched`, tous les filtres qui consomment la file doivent inclure les deux.
 
 ## Regle de travail demandee
 
