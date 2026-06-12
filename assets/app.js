@@ -1195,7 +1195,7 @@
   function mountPendingDeck(host, preferredId){
     const queue = pendingQueue(preferredId);
     const currentId = queue[0];
-    const ev = state.events.find(item => item.id === currentId && item.status === 'pending');
+    const ev = state.events.find(item => item.id === currentId && (item.status === 'pending' || item.status === 'matched'));
 
     if (!ev){
       toast('Vous avez deja fait votre choix sur les activites proposees');
