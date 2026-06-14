@@ -2,7 +2,7 @@
 
 Site romantique en une page pour organiser des rendez-vous, choisir un lieu sur une carte, garder des souvenirs et classer les activites terminees.
 
-Le site principal garde sa palette rose. Seule la demo publique utilise maintenant une palette mauve chargee a part.
+Le site principal garde sa palette rose. Seule la demo publique utilise maintenant une palette mauve chargee a part via [assets/demo-mauve.css](/Users/gestionnairedeparcinformatique-valentin/Documents/Sarah/assets/demo-mauve.css).
 
 ## Objectif
 

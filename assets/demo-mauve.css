@@ -52,6 +52,16 @@ body{
     radial-gradient(circle at 88% 8%, rgba(245,235,255,0.55), transparent 26%);
 }
 
+@media (min-width: 900px){
+  .shell{
+    box-shadow:
+      0 2px 2px rgba(0,0,0,0.18),
+      0 50px 90px -40px rgba(76,50,126,0.55),
+      inset 0 0 0 2px rgba(255,255,255,0.6);
+    background: #f7f0ff;
+  }
+}
+
 .inv-seal,
 .btn-primary,
 .fab-add,
@@ -78,4 +88,25 @@ body{
 .idea-card.active,
 .sugg-card.active{
   box-shadow: 0 0 0 2px rgba(155,109,255,0.22);
+}
+
+.lock-card input:focus,
+.field input:focus,
+.field textarea:focus{
+  border-color: var(--rose);
+}
+
+.inv-seal{ box-shadow: 0 6px 14px -6px rgba(114,70,199,0.7); }
+.btn-primary{ box-shadow: 0 12px 24px -12px rgba(114,70,199,0.8); }
+.nav-fab{ box-shadow: 0 12px 22px -8px rgba(114,70,199,0.9); }
+.env-seal{ box-shadow: 0 6px 14px -5px rgba(114,70,199,0.9); }
+.btn-yes{ box-shadow: 0 14px 26px -10px rgba(114,70,199,0.9); }
+
+.sheet-scrim{ background: rgba(49,35,63,0.42); }
+.offline-banner{ background: rgba(49,35,63,0.85); }
+
+.mc-day.today,
+.idea-card.active,
+.sugg-card.active{
+  border-color: var(--rose);
 }
