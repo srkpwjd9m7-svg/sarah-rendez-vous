@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#fff7ef">
 <title>Nos Rendez-vous</title>
 <link rel="stylesheet" href="assets/leaflet/leaflet.css">
-<link rel="stylesheet" href="assets/app.css?v=4">
+<link rel="stylesheet" href="assets/app.css?v=5">
 <script>
 // Runtime config — derives basePath from URL so the same files serve both
 // the production instance (/rdv/) and the public demo (/rdv-demo/).
@@ -23,12 +23,6 @@
     isDemo: isDemo,
   };
   if (isDemo) {
-    var themeMeta = document.querySelector('meta[name="theme-color"]');
-    if (themeMeta) themeMeta.setAttribute('content', '#f5efff');
-    var demoCss = document.createElement('link');
-    demoCss.rel = 'stylesheet';
-    demoCss.href = 'assets/demo-mauve.css?v=2';
-    document.head.appendChild(demoCss);
     try {
       localStorage.setItem('nos-rendez-vous-access-code', DEMO_CODE);
       sessionStorage.setItem('nos-rendez-vous-access-ok', 'ok');
