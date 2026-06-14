@@ -91,32 +91,32 @@
 }
 
 :root{
-  --bg: #f5efff;
-  --ink: #31233f;
-  --ink-soft: #625572;
-  --muted: #8e80a0;
-  --line: rgba(126, 87, 194, 0.16);
-  --line-soft: rgba(126, 87, 194, 0.10);
+  --bg: #fff7ef;
+  --ink: #3a2230;
+  --ink-soft: #6e5460;
+  --muted: #9b8089;
+  --line: rgba(196, 72, 98, 0.16);
+  --line-soft: rgba(196, 72, 98, 0.10);
 
-  --surface: #fffdfd;
-  --surface-2: #f7f1ff;
-  --blush: #eadcff;
-  --blush-deep: #dcc6ff;
+  --surface: #fffdfb;
+  --surface-2: #fff5f1;
+  --blush: #ffe3e8;
+  --blush-deep: #ffd2dc;
 
-  --rose: #9b6dff;
-  --rose-deep: #7246c7;
-  --coral: #b18cff;
-  --gold: #d8b4ff;
-  --gold-deep: #a56fe0;
-  --plum: #5a347f;
+  --rose: #e8657f;
+  --rose-deep: #c44862;
+  --coral: #f08a6e;
+  --gold: #f0c987;
+  --gold-deep: #d9a652;
+  --plum: #7d3b57;
 
-  --grad-rose: linear-gradient(135deg, #c9a7ff 0%, #9b6dff 52%, #7246c7 100%);
-  --grad-blush: linear-gradient(160deg, #fbf7ff 0%, #efe3ff 100%);
-  --grad-soft: linear-gradient(165deg, #ffffff 0%, #f4ecff 100%);
+  --grad-rose: linear-gradient(135deg, #f6997f 0%, #e8657f 52%, #c44862 100%);
+  --grad-blush: linear-gradient(160deg, #fff6f2 0%, #ffe7ec 100%);
+  --grad-soft: linear-gradient(165deg, #ffffff 0%, #fff3ef 100%);
 
-  --shadow-card: 0 18px 50px -18px rgba(96, 68, 146, 0.42);
-  --shadow-soft: 0 10px 28px -14px rgba(96, 68, 146, 0.32);
-  --shadow-pop: 0 26px 70px -22px rgba(96, 68, 146, 0.5);
+  --shadow-card: 0 18px 50px -18px rgba(150, 56, 78, 0.42);
+  --shadow-soft: 0 10px 28px -14px rgba(150, 56, 78, 0.32);
+  --shadow-pop: 0 26px 70px -22px rgba(150, 56, 78, 0.5);
 
   --r-lg: 30px;
   --r-md: 22px;
@@ -142,9 +142,9 @@ html, body{
 
 body{
   background:
-    radial-gradient(900px 500px at 15% -5%, #efe2ff 0%, transparent 55%),
-    radial-gradient(800px 500px at 95% 0%, #f5ebff 0%, transparent 50%),
-    linear-gradient(180deg, #f5efff 0%, #f1e8ff 100%);
+    radial-gradient(900px 500px at 15% -5%, #fbe9ec 0%, transparent 55%),
+    radial-gradient(800px 500px at 95% 0%, #fff1e8 0%, transparent 50%),
+    linear-gradient(180deg, #fff7ef 0%, #fff1e7 100%);
   min-height: 100vh;
   min-height: 100dvh;
 }
@@ -157,8 +157,8 @@ body{
   display: flex; align-items: center; justify-content: center;
   padding: 24px;
   background:
-    radial-gradient(60% 50% at 50% 30%, #eadcff 0%, transparent 60%),
-    linear-gradient(160deg, #f5efff 0%, #efe3ff 100%);
+    radial-gradient(60% 50% at 50% 30%, #ffe3e8 0%, transparent 60%),
+    linear-gradient(160deg, #fff7ef 0%, #ffe7ec 100%);
 }
 .lock-screen.is-hidden{ display: none; }
 .lock-card{

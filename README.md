@@ -2,7 +2,7 @@
 
 Site romantique en une page pour organiser des rendez-vous, choisir un lieu sur une carte, garder des souvenirs et classer les activites terminees.
 
-Le theme visuel principal du site utilise maintenant une palette mauve a la place de l'ancienne palette rose.
+Le site principal garde sa palette rose. Seule la demo publique utilise maintenant une palette mauve chargee a part.
 
 ## Objectif
 

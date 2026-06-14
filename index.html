@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f5efff">
+<meta name="theme-color" content="#fff7ef">
 <title>Nos Rendez-vous</title>
 <link rel="stylesheet" href="assets/leaflet/leaflet.css">
 <link rel="stylesheet" href="assets/app.css?v=3">
@@ -23,6 +23,12 @@
     isDemo: isDemo,
   };
   if (isDemo) {
+    var themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.setAttribute('content', '#f5efff');
+    var demoCss = document.createElement('link');
+    demoCss.rel = 'stylesheet';
+    demoCss.href = 'assets/demo-mauve.css?v=1';
+    document.head.appendChild(demoCss);
     try {
       localStorage.setItem('nos-rendez-vous-access-code', DEMO_CODE);
       sessionStorage.setItem('nos-rendez-vous-access-ok', 'ok');

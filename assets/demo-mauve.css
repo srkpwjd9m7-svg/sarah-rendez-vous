@@ -1,0 +1,81 @@
+:root{
+  --bg: #f5efff;
+  --ink: #31233f;
+  --ink-soft: #625572;
+  --muted: #8e80a0;
+  --line: rgba(126, 87, 194, 0.16);
+  --line-soft: rgba(126, 87, 194, 0.10);
+
+  --surface: #fffdfd;
+  --surface-2: #f7f1ff;
+  --blush: #eadcff;
+  --blush-deep: #dcc6ff;
+
+  --rose: #9b6dff;
+  --rose-deep: #7246c7;
+  --coral: #b18cff;
+  --gold: #d8b4ff;
+  --gold-deep: #a56fe0;
+  --plum: #5a347f;
+
+  --grad-rose: linear-gradient(135deg, #c9a7ff 0%, #9b6dff 52%, #7246c7 100%);
+  --grad-blush: linear-gradient(160deg, #fbf7ff 0%, #efe3ff 100%);
+  --grad-soft: linear-gradient(165deg, #ffffff 0%, #f4ecff 100%);
+
+  --shadow-card: 0 18px 50px -18px rgba(96, 68, 146, 0.42);
+  --shadow-soft: 0 10px 28px -14px rgba(96, 68, 146, 0.32);
+  --shadow-pop: 0 26px 70px -22px rgba(96, 68, 146, 0.5);
+}
+
+body{
+  background:
+    radial-gradient(900px 500px at 15% -5%, #efe2ff 0%, transparent 55%),
+    radial-gradient(800px 500px at 95% 0%, #f5ebff 0%, transparent 50%),
+    linear-gradient(180deg, #f5efff 0%, #f1e8ff 100%);
+}
+
+.lock-screen{
+  background:
+    radial-gradient(60% 50% at 50% 30%, #eadcff 0%, transparent 60%),
+    linear-gradient(160deg, #f5efff 0%, #efe3ff 100%);
+}
+
+.lock-card input:focus,
+.field input:focus,
+.field textarea:focus{
+  box-shadow: 0 0 0 3px rgba(155,109,255,0.16);
+}
+
+.shell::before{
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(220,198,255,0.5), transparent 30%),
+    radial-gradient(circle at 88% 8%, rgba(245,235,255,0.55), transparent 26%);
+}
+
+.inv-seal,
+.btn-primary,
+.fab-add,
+.cta,
+.idea-card.active .idea-ic,
+.sugg-card.active .sugg-ic,
+.sugg-card.active .sugg-add{
+  box-shadow: 0 12px 24px -12px rgba(114,70,199,0.8);
+}
+
+.fab-add{
+  box-shadow: 0 12px 22px -8px rgba(114,70,199,0.9);
+}
+
+.cta{
+  box-shadow: 0 14px 26px -10px rgba(114,70,199,0.9);
+}
+
+.idea-card:hover,
+.sugg-card:hover{
+  box-shadow: 0 6px 18px rgba(114,70,199,0.10);
+}
+
+.idea-card.active,
+.sugg-card.active{
+  box-shadow: 0 0 0 2px rgba(155,109,255,0.22);
+}
