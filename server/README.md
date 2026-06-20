@@ -68,6 +68,7 @@ db.exec(`
 addColumnIfMissing("ALTER TABLE date_events ADD COLUMN event_time TEXT DEFAULT ''");
 addColumnIfMissing("ALTER TABLE date_events ADD COLUMN rating INTEGER NOT NULL DEFAULT 0");
 addColumnIfMissing("ALTER TABLE date_events ADD COLUMN accepted INTEGER NOT NULL DEFAULT 1");
+addColumnIfMissing("ALTER TABLE date_events ADD COLUMN invitation_kind TEXT NOT NULL DEFAULT 'surprise'");
 ```
 
 Conséquence : **chaque restart de service applique automatiquement les
@@ -92,6 +93,16 @@ les deux instances finissent toujours avec le même schéma.
    et au paramètre de l'`INSERT`. Sinon le `DEFAULT` suffit.
 4. Push sur `main`. Le webhook fait le reste — prod garde ses données, démo
    est wipée + reseed.
+
+### Colonnes metier actuelles a retenir
+
+- `accepted` : distingue un rendez-vous confirme d'une invitation encore en attente
+- `approval_count` : compteur de validations (`0..2`)
+- `invitation_kind` : `surprise` ou `mandatory`
+
+Le front s'appuie sur `invitation_kind='mandatory'` pour savoir qu'une date a
+deja ete imposee et que la prochaine validation doit envoyer l'event
+directement en `confirmed`.
 
 ### Ajouter une table
 

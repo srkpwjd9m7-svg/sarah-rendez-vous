@@ -95,6 +95,18 @@ Une invitation peut aussi etre creee **sans date** : elle reste a l'etat `pendin
 
 Schema des statuts cote front : `pending` | `matched` | `confirmed` | `toValidate` | `done`.
 
+### 4 ter. Invitation obligatoire
+
+Le projet gere maintenant un second type d'invitation : `mandatory`.
+
+- la personne qui cree l'invitation choisit obligatoirement la date et l'heure des le depart
+- l'invitation reste en `pending`, mais avec `approvalCount=1` car l'auteur a deja valide sa propre proposition
+- l'autre personne recoit une notification navigateur si autorisee, puis une pop-up automatique dans l'application
+- quand l'autre personne valide, le rendez-vous passe directement en `confirmed`
+- contrairement au mode surprise, il n'y a pas d'etape `matched` intermediaire : la date est deja fixee
+
+Techniquement, ce mode est stocke via `invitation_kind = 'mandatory'` cote API.
+
 ### 5. Validation de fin de rendez-vous
 
 A la fin d'un rendez-vous, il est possible de :
@@ -221,6 +233,7 @@ Chaque rendez-vous enregistre contient actuellement une structure proche de :
   note,
   photos,
   status,         // 'pending' | 'matched' | 'confirmed' | 'toValidate' | 'done'
+  invitationKind, // 'surprise' | 'mandatory'
   approvalCount,  // 0..2 (nombre de "oui" sur une invitation)
   rating,
   completed,
@@ -229,7 +242,7 @@ Chaque rendez-vous enregistre contient actuellement une structure proche de :
 }
 ```
 
-Cote backend, le champ correspond a la colonne `approval_count` de la table `date_events` (`INTEGER NOT NULL DEFAULT 0`, clampe 0..2 a l'ecriture). Le serveur autorise un `POST /api/events` sans `event_date` uniquement si `accepted=false` (invitation `pending`).
+Cote backend, le champ correspond a la colonne `approval_count` de la table `date_events` (`INTEGER NOT NULL DEFAULT 0`, clampe 0..2 a l'ecriture). Le type d'invitation est stocke dans `invitation_kind` (`surprise` ou `mandatory`). Le serveur autorise un `POST /api/events` sans `event_date` uniquement si `accepted=false` (invitation `pending`).
 
 Quand l'API est joignable, ces donnees sont stockees cote serveur (table `date_events`).
 

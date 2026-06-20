@@ -14,6 +14,7 @@
   const API_BASE = (window.__rdvConfig && window.__rdvConfig.apiBase) || '/rdv/api';
   const STORAGE_KEY = 'nos-rendez-vous-events';
   const PENDING_ORDER_KEY = 'nos-rendez-vous-pending-order';
+  const MANDATORY_SEEN_KEY = 'nos-rendez-vous-mandatory-seen';
   const ACCESS_CODE_KEY = 'nos-rendez-vous-access-code';
   const DEFAULT_ACCESS_CODE = '01052021';
   const NOMINATIM = 'https://nominatim.openstreetmap.org';
@@ -143,6 +144,7 @@
       note: e.note || '',
       status,
       approvalCount: Math.max(0, Math.min(2, e.approval_count || 0)),
+      invitationKind: e.invitation_kind === 'mandatory' ? 'mandatory' : 'surprise',
       rating: e.rating || 0,
       memory: e.completion_note || '',
       photos: Array.isArray(e.completion_photos) ? e.completion_photos : [],
@@ -160,6 +162,7 @@
       map_link: s.mapLink || '',
       note: s.note || '',
       photos: s.intentPhotos || [],
+      invitation_kind: s.invitationKind === 'mandatory' ? 'mandatory' : 'surprise',
       accepted: (s.status === 'pending' || s.status === 'matched') ? 0 : 1,
       approval_count: s.status === 'matched' ? 2 : Math.max(0, Math.min(2, s.approvalCount || 0)),
     };
@@ -174,7 +177,93 @@
     apiOnline: false,
     calOffset: 0, // month offset from current
     pendingOrder: [],
+    mandatoryPopupId: null,
+    refreshTimer: null,
   };
+
+  function loadMandatorySeen(){
+    try {
+      const raw = JSON.parse(localStorage.getItem(MANDATORY_SEEN_KEY) || '[]');
+      return Array.isArray(raw) ? raw.filter(id => typeof id === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveMandatorySeen(ids){
+    try { localStorage.setItem(MANDATORY_SEEN_KEY, JSON.stringify(ids)); } catch {}
+  }
+
+  function markMandatorySeen(id){
+    if (!id) return;
+    const seen = loadMandatorySeen();
+    if (seen.includes(id)) return;
+    seen.push(id);
+    saveMandatorySeen(seen);
+  }
+
+  function isMandatorySeen(id){
+    return loadMandatorySeen().includes(id);
+  }
+
+  function trimMandatorySeen(){
+    const activeIds = new Set(
+      state.events
+        .filter(e => e.invitationKind === 'mandatory' && e.status === 'pending')
+        .map(e => e.id)
+    );
+    const seen = loadMandatorySeen().filter(id => activeIds.has(id));
+    saveMandatorySeen(seen);
+  }
+
+  function mandatoryLabel(ev){
+    return ev.invitationKind === 'mandatory' ? 'Invitation obligatoire' : 'Invitation surprise';
+  }
+
+  function mandatoryApprovalText(ev){
+    if (ev.invitationKind === 'mandatory') {
+      return ev.status === 'confirmed'
+        ? 'Date validée'
+        : `Date imposée · ${Math.max(0, Math.min(2, ev.approvalCount || 0))}/2 validations`;
+    }
+    return ev.status === 'matched'
+      ? '2/2 oui · date à choisir'
+      : `${Math.max(0, Math.min(2, ev.approvalCount || 0))}/2 oui · en attente`;
+  }
+
+  function maybeNotifyMandatoryInvitation(ev){
+    if (!ev || ev.invitationKind !== 'mandatory' || ev.status !== 'pending') return;
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      try {
+        const when = hasPlannedDate(ev.date) ? `${fmtLong(ev.date)}${ev.time ? ' à ' + ev.time : ''}` : 'date à confirmer';
+        new Notification('Invitation obligatoire', {
+          body: `${ev.title} · ${when}`,
+        });
+      } catch {}
+    }
+  }
+
+  function maybeOpenMandatoryPopup(){
+    if (shellInner.querySelector('.inv-overlay') || shellInner.querySelector('.pending-deck-overlay')) return;
+    trimMandatorySeen();
+    const pendingMandatory = state.events.find(e =>
+      e.invitationKind === 'mandatory' &&
+      e.status === 'pending' &&
+      !isMandatorySeen(e.id)
+    );
+    if (!pendingMandatory) return;
+    markMandatorySeen(pendingMandatory.id);
+    state.mandatoryPopupId = pendingMandatory.id;
+    maybeNotifyMandatoryInvitation(pendingMandatory);
+    setTimeout(() => {
+      if (state.mandatoryPopupId === pendingMandatory.id) openInvitationOverlay(pendingMandatory.id);
+    }, 180);
+  }
 
   function loadPendingOrder(){
     try {
@@ -227,6 +316,7 @@
         lsSave(mapped); // mirror to local for offline
         state.events = mapped;
         syncPendingOrder();
+        trimMandatorySeen();
         return mapped;
       } catch (e) {
         state.apiOnline = false;
@@ -236,6 +326,7 @@
     const local = lsLoad();
     state.events = local;
     syncPendingOrder();
+    trimMandatorySeen();
     return local;
   }
 
@@ -266,6 +357,7 @@
         if ('note' in patch) body.note = patch.note;
         if ('memory' in patch) body.completion_note = patch.memory;
         if ('approvalCount' in patch) body.approval_count = patch.approvalCount;
+        if ('invitationKind' in patch) body.invitation_kind = patch.invitationKind;
         if ('rating' in patch) body.rating = patch.rating;
         if ('photos' in patch) body.completion_photos = patch.photos;
         if ('intentPhotos' in patch) body.photos = patch.intentPhotos;
@@ -461,9 +553,9 @@
             <div class="inv-seal">${ICON.heart}</div>
             <div class="ip-body">
               <div class="ip-t">${escapeHTML(e.title)}</div>
-              <div class="ip-s">${e.status === 'matched' ? '2/2 oui · date à choisir' : `${Math.max(0, Math.min(2, e.approvalCount || 0))}/2 oui · en attente`}</div>
+              <div class="ip-s">${mandatoryApprovalText(e)}</div>
             </div>
-            <div class="ip-go">${e.status === 'matched' ? 'Choisir →' : 'Ouvrir →'}</div>
+            <div class="ip-go">${e.status === 'matched' ? 'Choisir →' : (e.invitationKind === 'mandatory' ? 'Valider →' : 'Ouvrir →')}</div>
           </div>`).join('')}
       </div>` : '';
 
@@ -548,11 +640,12 @@
           ${tag(e.status)}
         </div>
         ${e.note ? `<p class="ev-note">« ${escapeHTML(e.note)} »</p>` : ''}
+        ${e.status === 'pending' ? `<p class="ev-note">${escapeHTML(mandatoryLabel(e))}${e.invitationKind === 'mandatory' && hasPlannedDate(e.date) ? ` · ${escapeHTML(fmtLong(e.date))}` : ''}</p>` : ''}
         <div class="ev-actions">
           ${e.status === 'toValidate'
             ? `<button class="btn btn-primary btn-sm" data-validate="${e.id}">${ICON.check} Valider le RDV</button>`
             : e.status === 'pending'
-            ? `<button class="btn btn-soft btn-sm" data-open-inv="${e.id}">${ICON.gift} Voir l'invitation</button>
+            ? `<button class="btn btn-soft btn-sm" data-open-inv="${e.id}">${ICON.gift} ${e.invitationKind === 'mandatory' ? 'Valider l’invitation' : "Voir l'invitation"}</button>
                <button class="btn btn-primary btn-sm" data-share-inv="${e.id}">${ICON.share} Partager</button>`
             : `<button class="btn btn-ghost btn-sm" data-edit="${e.id}">${ICON.edit} Modifier</button>`}
           <button class="btn btn-icon btn-sm" data-delete="${e.id}" title="Supprimer">${ICON.trash}</button>
@@ -756,13 +849,17 @@
     const isNew = !i.id;
     const isSchedulingMatch = !!opts.forceDateStep;
     const showDateTimeField = !isNew || isSchedulingMatch;
-    const showSendMode = !isNew && !isSchedulingMatch;
+    const showSendMode = !isSchedulingMatch;
+    const invitationKind = i.invitationKind === 'mandatory' ? 'mandatory' : 'surprise';
+    const inviteSelected = invitationKind !== 'mandatory' && (i.status === 'pending' || !i.id || i.status === 'matched');
+    const mandatorySelected = invitationKind === 'mandatory';
+    const directSelected = i.status === 'confirmed';
     return `
       <div class="sheet-scrim" id="sheet-scrim">
         <div class="sheet">
           <div class="sheet-grip"></div>
           <h2>${isSchedulingMatch ? 'Choisir la date' : (isNew ? 'Nouveau' : 'Modifier') + ' rendez-vous'}</h2>
-          <p class="sub">${isSchedulingMatch ? 'Vous avez tous les deux dit oui. Il ne reste plus qu’à fixer la date.' : (isNew ? "Crée d'abord l'invitation, la date pourra venir après." : 'Ajuste comme tu veux.')}</p>
+          <p class="sub">${isSchedulingMatch ? 'Vous avez tous les deux dit oui. Il ne reste plus qu’à fixer la date.' : (isNew ? "Crée d'abord l'invitation, la date pourra venir après ou être imposée tout de suite." : 'Ajuste comme tu veux.')}</p>
 
           ${(isNew && !isSchedulingMatch) ? composerHTML() : ''}
 
@@ -787,9 +884,11 @@
           <div class="field" style="display:${showSendMode ? 'block' : 'none'}">
             <label>Comment l'envoyer ?</label>
             <div class="seg" id="send-seg">
-              <button type="button" class="${(i.status==='pending'||!i.id||i.status==='matched')?'on':''}" data-seg="invite">${ICON.gift} Invitation surprise</button>
-              <button type="button" class="${i.status==='confirmed'?'on':''}" data-seg="direct">Ajouter direct</button>
+              <button type="button" class="${inviteSelected?'on':''}" data-seg="invite">${ICON.gift} Invitation surprise</button>
+              <button type="button" class="${mandatorySelected?'on':''}" data-seg="mandatory">${ICON.check} Invitation obligatoire</button>
+              <button type="button" class="${directSelected?'on':''}" data-seg="direct">Ajouter direct</button>
             </div>
+            <p class="tiny" id="send-help" style="margin:7px 2px 0">${invitationKind === 'mandatory' ? "Tu imposes la date et l'autre personne doit la valider." : "Invitation surprise : la date peut être choisie plus tard."}</p>
           </div>
 
           <div style="display:flex;gap:10px;margin-top:6px">
@@ -801,6 +900,7 @@
   }
 
   function openSheet(initial, options){
+    const initialInvitationKind = initial && initial.invitationKind === 'mandatory' ? 'mandatory' : 'surprise';
     const wrap = document.createElement('div');
     wrap.innerHTML = formSheetHTML(initial, options);
     const scrim = wrap.firstElementChild;
@@ -933,18 +1033,35 @@
     }
 
     // Segmented control
-    let sendMode = isNewEvent(initial, options) ? 'invite' : ((options && options.forceDateStep) ? 'direct' : ((initial && initial.status === 'confirmed') ? 'direct' : 'invite'));
+    let sendMode = isNewEvent(initial, options)
+      ? (initialInvitationKind === 'mandatory' ? 'mandatory' : 'invite')
+      : ((options && options.forceDateStep) ? 'direct' : ((initial && initial.status === 'confirmed') ? 'direct' : (initialInvitationKind === 'mandatory' ? 'mandatory' : 'invite')));
     const dateTimeField = scrim.querySelector('#date-time-field');
+    const saveBtn = scrim.querySelector('#sheet-save');
+    const sendHelp = scrim.querySelector('#send-help');
+    const updateSendModeUI = () => {
+      if (dateTimeField) dateTimeField.style.display = sendMode === 'direct' || sendMode === 'mandatory' ? 'flex' : 'none';
+      if (!saveBtn) return;
+      if (sendMode === 'invite') saveBtn.innerHTML = ICON.heart + " Envoyer l'invitation";
+      else if (sendMode === 'mandatory') saveBtn.innerHTML = ICON.check + ' Envoyer la date à valider';
+      else saveBtn.innerHTML = ICON.check + ' Ajouter au calendrier';
+      if (sendHelp){
+        sendHelp.textContent = sendMode === 'mandatory'
+          ? "Tu imposes la date et l'autre personne doit la valider."
+          : (sendMode === 'invite'
+            ? "Invitation surprise : la date peut être choisie plus tard."
+            : 'Le rendez-vous est ajouté directement au calendrier.');
+      }
+    };
     scrim.querySelectorAll('#send-seg button').forEach(b => {
       b.addEventListener('click', () => {
         scrim.querySelectorAll('#send-seg button').forEach(x => x.classList.remove('on'));
         b.classList.add('on');
         sendMode = b.dataset.seg;
-        if (dateTimeField) dateTimeField.style.display = sendMode === 'invite' ? 'none' : 'flex';
-        scrim.querySelector('#sheet-save').innerHTML =
-          sendMode === 'invite' ? ICON.heart + " Envoyer l'invitation" : ICON.check + ' Ajouter au calendrier';
+        updateSendModeUI();
       });
     });
+    updateSendModeUI();
 
     const close = () => { scrim.classList.remove('open'); setTimeout(() => scrim.remove(), 320); };
     scrim.querySelector('#sheet-cancel').addEventListener('click', close);
@@ -959,10 +1076,11 @@
         note: scrim.querySelector('#f-note').value.trim(),
         coordinates: coords,
         mapLink: mapLink,
-        status: sendMode === 'invite' ? 'pending' : 'confirmed',
-        approvalCount: (options && options.forceDateStep) ? 2 : (sendMode === 'invite' ? 0 : 2),
+        status: sendMode === 'invite' || sendMode === 'mandatory' ? 'pending' : 'confirmed',
+        approvalCount: (options && options.forceDateStep) ? 2 : (sendMode === 'invite' ? 0 : (sendMode === 'mandatory' ? 1 : 2)),
+        invitationKind: sendMode === 'mandatory' ? 'mandatory' : 'surprise',
       };
-      if (sendMode !== 'invite' && !data.date) {
+      if ((sendMode === 'mandatory' || sendMode === 'direct') && !data.date) {
         toast('Choisis une date pour finaliser');
         return;
       }
@@ -970,17 +1088,26 @@
         if (initial && initial.id){
           await updateEvent(initial.id, data);
         } else {
-          await createEvent(data);
+          const created = await createEvent(data);
+          if (created && data.invitationKind === 'mandatory' && data.status === 'pending') markMandatorySeen(created.id);
         }
       } catch (e) {
         toast('Erreur de sauvegarde');
       }
       close();
       state.events = await loadEvents();
+      maybeOpenMandatoryPopup();
       if (sendMode === 'invite') state.screen = 'dash';
+      else if (sendMode === 'mandatory') state.screen = 'dash';
       else state.screen = 'cal';
       setTimeout(render, 220);
-      setTimeout(() => toast((options && options.forceDateStep) ? 'Date fixée ❤' : (sendMode === 'invite' ? 'Invitation envoyée ❤' : 'Rendez-vous ajouté')), 260);
+      setTimeout(() => toast(
+        (options && options.forceDateStep)
+          ? 'Date fixée ❤'
+          : (sendMode === 'invite'
+            ? 'Invitation envoyée ❤'
+            : (sendMode === 'mandatory' ? 'Invitation obligatoire envoyée ❤' : 'Rendez-vous ajouté'))
+      ), 260);
     });
   }
 
@@ -1118,12 +1245,12 @@
             <div class="swipe-card-head">
               <div class="swipe-heart">${ICON.heart}</div>
               <div>
-                <div class="swipe-kicker">Invitation surprise</div>
+                <div class="swipe-kicker">${escapeHTML(mandatoryLabel(ev))}</div>
                 <h1>${escapeHTML(ev.title)}</h1>
               </div>
             </div>
             <div class="swipe-detail-list">
-              <div class="row">${ICON.cal} ${ev.status === 'matched' ? 'Vous avez matché, il reste à fixer la date' : `${Math.max(0, Math.min(2, ev.approvalCount || 0))}/2 oui pour le moment`}</div>
+              <div class="row">${ICON.cal} ${ev.status === 'matched' ? 'Vous avez matché, il reste à fixer la date' : mandatoryApprovalText(ev)}</div>
               ${hasPlannedDate(ev.date) ? `<div class="row">${ICON.clock} ${escapeHTML(ev.time || '20:00')}</div>` : ''}
               <div class="row">${ICON.pin} ${escapeHTML(ev.location)}</div>
             </div>
@@ -1138,7 +1265,7 @@
 
         <div class="swipe-actions-bar">
           <button class="btn btn-ghost" type="button" data-pending-skip>Passer pour l'instant</button>
-          <button class="btn btn-primary" type="button" data-pending-accept>${ev.status === 'matched' ? 'Choisir la date' : 'Dire oui'}</button>
+          <button class="btn btn-primary" type="button" data-pending-accept>${ev.status === 'matched' ? 'Choisir la date' : (ev.invitationKind === 'mandatory' ? 'Valider la date' : 'Dire oui')}</button>
         </div>
       </div>`;
   }
@@ -1154,19 +1281,22 @@
     const current = state.events.find(event => event.id === id);
     if (!current) return { matched: false };
     const nextApprovalCount = Math.max(0, Math.min(2, (current.approvalCount || 0) + 1));
+    const nextStatus = current.invitationKind === 'mandatory'
+      ? (nextApprovalCount >= 2 ? 'confirmed' : 'pending')
+      : (nextApprovalCount >= 2 ? 'matched' : 'pending');
     try {
       await updateEvent(id, {
-        status: nextApprovalCount >= 2 ? 'matched' : 'pending',
+        status: nextStatus,
         approvalCount: nextApprovalCount,
       });
     } catch {}
     state.events = await loadEvents();
     if (nextApprovalCount >= 2) {
       savePendingOrder(state.pendingOrder);
-      return { matched: true };
+      return { matched: current.invitationKind !== 'mandatory', confirmed: current.invitationKind === 'mandatory' };
     }
     movePendingToEnd(id);
-    return { matched: false };
+    return { matched: false, confirmed: false };
   }
 
   function openMatchedScheduling(ev){
@@ -1189,6 +1319,7 @@
   function closePendingDeck(){
     const overlay = shellInner.querySelector('.pending-deck-overlay');
     if (overlay) overlay.remove();
+    state.mandatoryPopupId = null;
     render();
   }
 
@@ -1223,6 +1354,11 @@
           return;
         }
         const result = await acceptPendingInvitation(ev.id);
+        if (result.confirmed) {
+          toast('Invitation obligatoire validée ❤');
+          closePendingDeck();
+          return;
+        }
         if (result.matched) {
           const updated = state.events.find(item => item.id === ev.id);
           if (updated) {
@@ -1231,7 +1367,7 @@
             return;
           }
         }
-        toast('Premier oui enregistré ❤');
+        toast(ev.invitationKind === 'mandatory' ? 'Date validée ❤' : 'Premier oui enregistré ❤');
       } else {
         movePendingToEnd(ev.id);
       }
@@ -1328,10 +1464,10 @@
         <div class="inv-reveal">
           <div class="inv-hand">${sweet}</div>
           <h1 class="inv-title">${escapeHTML(ev.title)}</h1>
-          <div class="inv-hand" style="font-size:18px;margin-top:6px">${ask}</div>
+          <div class="inv-hand" style="font-size:18px;margin-top:6px">${ev.invitationKind === 'mandatory' ? "Cette date t'est proposée, tu la valides ?" : ask}</div>
           ${invDetailHTML(ev)}
           <div class="inv-cta">
-            <button class="btn-yes" type="button">Oui, avec joie</button>
+            <button class="btn-yes" type="button">${ev.invitationKind === 'mandatory' ? 'Je valide la date' : 'Oui, avec joie'}</button>
             <button class="btn-no" type="button">Non</button>
           </div>
           <p class="tiny" style="margin-top:18px" data-gag-hint></p>
@@ -1412,9 +1548,12 @@
       confettiBurst(layer);
       setTimeout(() => success.classList.add('show'), 260);
       const nextApprovalCount = Math.max(0, Math.min(2, (ev.approvalCount || 0) + 1));
+      const nextStatus = ev.invitationKind === 'mandatory'
+        ? (nextApprovalCount >= 2 ? 'confirmed' : 'pending')
+        : (nextApprovalCount >= 2 ? 'matched' : 'pending');
       try {
         await updateEvent(ev.id, {
-          status: nextApprovalCount >= 2 ? 'matched' : 'pending',
+          status: nextStatus,
           approvalCount: nextApprovalCount,
         });
       } catch {}
@@ -1547,6 +1686,7 @@
   function closeInvitation(){
     const overlay = shellInner.querySelector('.inv-overlay');
     if (overlay) overlay.remove();
+    state.mandatoryPopupId = null;
     state.screen = 'dash';
     render();
   }
@@ -1690,6 +1830,25 @@
         history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
       }
     } catch {}
+
+    maybeOpenMandatoryPopup();
+    if (state.refreshTimer) clearInterval(state.refreshTimer);
+    state.refreshTimer = setInterval(async () => {
+      const previousPending = new Set(
+        state.events
+          .filter(e => e.invitationKind === 'mandatory' && e.status === 'pending')
+          .map(e => e.id)
+      );
+      state.events = await loadEvents();
+      render();
+      const nextPending = state.events.find(e =>
+        e.invitationKind === 'mandatory' &&
+        e.status === 'pending' &&
+        !previousPending.has(e.id) &&
+        !isMandatorySeen(e.id)
+      );
+      if (nextPending) maybeOpenMandatoryPopup();
+    }, 30000);
   }
 
   start();

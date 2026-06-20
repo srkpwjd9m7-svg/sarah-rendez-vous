@@ -9,6 +9,7 @@
 - Auto-deploy : push sur `main` -> webhook GitHub -> `git reset --hard` cote serveur (+ filet cron 5 min)
 - Notif Telegram a chaque deploy reussi/echec
 - Flux d'invitations a deux temps (`pending` -> `matched` -> `confirmed`) avec deck swipe et `approval_count` 0..2
+- Invitations obligatoires avec date imposee + pop-up automatique de validation
 
 ## Direction produit
 
@@ -52,3 +53,4 @@ Le projet vise a devenir une app mobile (iOS + Android) en **React Native** plus
 | 2026-06-11 | Photos sur disque local + Caddy | Pas de S3 inutile a cette echelle ; backup classique |
 | 2026-06-11 | Code secret en header | Etape transition ; on remplacera par auth user des qu'on ajoute >1 personne |
 | 2026-06-12 | Invitations a deux temps (`approval_count` 0..2 + statut `matched`) | Permet de creer une invitation sans date et de la valider a deux avant de fixer le RDV. Etape vers le futur mode multi-utilisateurs. Piege a retenir : la file d'invitations (`pendingQueue`) contient `pending` ET `matched` — tout filtre cote front doit inclure les deux statuts. |
+| 2026-06-20 | Ajouter `invitation_kind` (`surprise` / `mandatory`) | Le mode obligatoire impose la date a la creation, declenche une pop-up et passe directement a `confirmed` des que l'autre personne valide. |
