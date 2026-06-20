@@ -876,14 +876,14 @@ body{
 
 /* segmented */
 .seg{
-  display: flex; background: var(--surface-2); border-radius: 999px; padding: 4px;
+  display: flex; flex-wrap: wrap; gap: 4px; background: var(--surface-2); border-radius: 22px; padding: 4px;
   border: 1px solid var(--line);
 }
 .seg button{
-  flex: 1; border: none; background: transparent; cursor: pointer;
-  padding: 9px; border-radius: 999px; font: inherit; font-weight: 800; font-size: 12.5px;
+  flex: 1 1 0; min-width: 0; border: none; background: transparent; cursor: pointer;
+  padding: 9px 10px; border-radius: 999px; font: inherit; font-weight: 800; font-size: 12.5px;
   color: var(--muted);
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-align: center;
 }
 .seg button.on{ background: var(--surface); color: var(--rose-deep); box-shadow: var(--shadow-soft); }
 

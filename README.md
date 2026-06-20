@@ -57,6 +57,12 @@ Chaque rendez-vous peut contenir :
 - un texte libre
 - des photos
 
+Au moment de la creation, l'ecran propose maintenant 3 modes d'envoi :
+
+- `Invitation surprise`
+- `Invitation obligatoire`
+- `Ajouter direct`
+
 ### 3. Selection du lieu sur carte
 
 Le lieu peut etre choisi de deux manieres :
