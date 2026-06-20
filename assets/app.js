@@ -853,7 +853,6 @@
     const invitationKind = i.invitationKind === 'mandatory' ? 'mandatory' : 'surprise';
     const inviteSelected = invitationKind !== 'mandatory' && (i.status === 'pending' || !i.id || i.status === 'matched');
     const mandatorySelected = invitationKind === 'mandatory';
-    const directSelected = i.status === 'confirmed';
     return `
       <div class="sheet-scrim" id="sheet-scrim">
         <div class="sheet">
@@ -886,9 +885,8 @@
             <div class="seg" id="send-seg">
               <button type="button" class="${inviteSelected?'on':''}" data-seg="invite">${ICON.gift} Invitation surprise</button>
               <button type="button" class="${mandatorySelected?'on':''}" data-seg="mandatory">${ICON.check} Invitation obligatoire</button>
-              <button type="button" class="${directSelected?'on':''}" data-seg="direct">Ajouter direct</button>
             </div>
-            <p class="tiny" id="send-help" style="margin:7px 2px 0">${invitationKind === 'mandatory' ? "Tu imposes la date et l'autre personne doit la valider." : "Invitation surprise : la date peut être choisie plus tard."}</p>
+            <p class="tiny" id="send-help" style="margin:7px 2px 0">${invitationKind === 'mandatory' ? "Tu imposes la date et l'autre personne doit la valider." : "Invitation surprise : la date sera choisie apres validation des deux personnes."}</p>
           </div>
 
           <div style="display:flex;gap:10px;margin-top:6px">
@@ -1035,22 +1033,20 @@
     // Segmented control
     let sendMode = isNewEvent(initial, options)
       ? (initialInvitationKind === 'mandatory' ? 'mandatory' : 'invite')
-      : ((options && options.forceDateStep) ? 'direct' : ((initial && initial.status === 'confirmed') ? 'direct' : (initialInvitationKind === 'mandatory' ? 'mandatory' : 'invite')));
+      : ((options && options.forceDateStep) ? 'direct' : (initialInvitationKind === 'mandatory' ? 'mandatory' : 'invite'));
     const dateTimeField = scrim.querySelector('#date-time-field');
     const saveBtn = scrim.querySelector('#sheet-save');
     const sendHelp = scrim.querySelector('#send-help');
     const updateSendModeUI = () => {
-      if (dateTimeField) dateTimeField.style.display = sendMode === 'direct' || sendMode === 'mandatory' ? 'flex' : 'none';
+      if (dateTimeField) dateTimeField.style.display = sendMode === 'mandatory' || !!(options && options.forceDateStep) ? 'flex' : 'none';
       if (!saveBtn) return;
       if (sendMode === 'invite') saveBtn.innerHTML = ICON.heart + " Envoyer l'invitation";
       else if (sendMode === 'mandatory') saveBtn.innerHTML = ICON.check + ' Envoyer la date à valider';
-      else saveBtn.innerHTML = ICON.check + ' Ajouter au calendrier';
+      else saveBtn.innerHTML = ICON.check + ' Valider la date';
       if (sendHelp){
         sendHelp.textContent = sendMode === 'mandatory'
           ? "Tu imposes la date et l'autre personne doit la valider."
-          : (sendMode === 'invite'
-            ? "Invitation surprise : la date peut être choisie plus tard."
-            : 'Le rendez-vous est ajouté directement au calendrier.');
+          : "Invitation surprise : la date sera choisie apres validation des deux personnes.";
       }
     };
     scrim.querySelectorAll('#send-seg button').forEach(b => {
@@ -1080,7 +1076,7 @@
         approvalCount: (options && options.forceDateStep) ? 2 : (sendMode === 'invite' ? 0 : (sendMode === 'mandatory' ? 1 : 2)),
         invitationKind: sendMode === 'mandatory' ? 'mandatory' : 'surprise',
       };
-      if ((sendMode === 'mandatory' || sendMode === 'direct') && !data.date) {
+      if ((sendMode === 'mandatory' || (options && options.forceDateStep)) && !data.date) {
         toast('Choisis une date pour finaliser');
         return;
       }
@@ -1106,7 +1102,7 @@
           ? 'Date fixée ❤'
           : (sendMode === 'invite'
             ? 'Invitation envoyée ❤'
-            : (sendMode === 'mandatory' ? 'Invitation obligatoire envoyée ❤' : 'Rendez-vous ajouté'))
+            : 'Invitation obligatoire envoyée ❤')
       ), 260);
     });
   }

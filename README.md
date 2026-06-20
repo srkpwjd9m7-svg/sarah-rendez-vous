@@ -57,11 +57,12 @@ Chaque rendez-vous peut contenir :
 - un texte libre
 - des photos
 
-Au moment de la creation, l'ecran propose maintenant 3 modes d'envoi :
+Au moment de la creation, l'ecran propose maintenant 2 modes d'envoi :
 
 - `Invitation surprise`
 - `Invitation obligatoire`
-- `Ajouter direct`
+
+Aucun rendez-vous ne peut etre ajoute directement au calendrier sans que l'autre personne voie d'abord l'invitation.
 
 ### 3. Selection du lieu sur carte
 
